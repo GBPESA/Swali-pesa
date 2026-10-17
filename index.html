@@ -93,7 +93,7 @@ footer{text-align:center;font-size:12px;padding:18px}
   <input id="loginEmail" type="email" autocomplete="email">
   <label>Nenosiri</label>
   <input id="loginPassword" type="password" autocomplete="current-password">
-  <button class="full" onclick="login()">INGIA</button>
+  <button type="button" class="full" onclick="window.login()">INGIA</button>
   <button type="button" class="full secondary"
         onclick="window.showRegister()">
   FUNGUA AKAUNTI
@@ -111,7 +111,7 @@ footer{text-align:center;font-size:12px;padding:18px}
   <input id="regPassword" type="password" minlength="6" autocomplete="new-password">
   <label>Msimbo wa aliyekualika (si lazima)</label>
   <input id="regReferral">
-  <button class="full" onclick="registerUser()">JISAJILI</button>
+  <button type="button" class="full" onclick="window.registerUser()">JISAJILI</button> 
   <button type="button" class="full secondary"
         onclick="window.showLogin()">
   RUDI LOGIN
@@ -417,7 +417,10 @@ async function handleSignedIn(user) {
 
   showPanel("quizPanel");
 }
-
+window.login = login;
+window.registerUser = registerUser;
+window.showRegister = showRegister;
+window.showLogin = showLogin;
 /* THIBITISHA ADMIN KUPITIA SUPABASE */
 async function checkAdmin() {
   const { data, error } = await supabase.rpc("sp_is_admin");
