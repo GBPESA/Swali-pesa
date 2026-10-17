@@ -878,6 +878,43 @@ supabase.auth.onAuthStateChange((event, session) => {
 });
 
 initializeApp();
+ 
+window.showRegister = function () {
+  const loginForm = document.getElementById("loginForm");
+  const registerForm = document.getElementById("registerForm");
+  const authTitle = document.getElementById("authTitle");
+  const authMessage = document.getElementById("authMessage");
+
+  if (!loginForm || !registerForm || !authTitle) {
+    alert("Sehemu za usajili hazijapatikana kwenye HTML.");
+    return;
+  }
+
+  loginForm.classList.add("hidden");
+  registerForm.classList.remove("hidden");
+  authTitle.textContent = "Jisajili SWALI PESA";
+
+  if (authMessage) authMessage.textContent = "";
+};
+
+window.showLogin = function () {
+  const loginForm = document.getElementById("loginForm");
+  const registerForm = document.getElementById("registerForm");
+  const authTitle = document.getElementById("authTitle");
+  const authMessage = document.getElementById("authMessage");
+
+  if (!loginForm || !registerForm || !authTitle) {
+    alert("Sehemu za kuingia hazijapatikana kwenye HTML.");
+    return;
+  }
+
+  registerForm.classList.add("hidden");
+  loginForm.classList.remove("hidden");
+  authTitle.textContent = "Ingia SWALI PESA";
+
+  if (authMessage) authMessage.textContent = "";
+};
+
 </script>
 </body>
 </html>
