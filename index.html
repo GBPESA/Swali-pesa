@@ -94,10 +94,16 @@ footer{text-align:center;font-size:12px;padding:18px}
   <label>Nenosiri</label>
   <input id="loginPassword" type="password" autocomplete="current-password">
   <button type="button" class="full" onclick="window.login()">INGIA</button>
-  <button type="button" class="full secondary"
-        onclick="window.showRegister()">
+  
+<button type="button" class="full secondary"
+  onclick="
+    document.getElementById('loginForm').classList.add('hidden');
+    document.getElementById('registerForm').classList.remove('hidden');
+    document.getElementById('authTitle').textContent='Jisajili SWALI PESA';
+    document.getElementById('authMessage').textContent='';
+  ">
   FUNGUA AKAUNTI
-  </button>
+</button>
  </div>
 
  <div id="registerForm" class="hidden">
@@ -112,9 +118,16 @@ footer{text-align:center;font-size:12px;padding:18px}
   <label>Msimbo wa aliyekualika (si lazima)</label>
   <input id="regReferral">
   <button type="button" class="full" onclick="window.registerUser()">JISAJILI</button> 
-  <button type="button" class="full secondary"
-        onclick="window.showLogin()">
+  
+<button type="button" class="full secondary"
+  onclick="
+    document.getElementById('registerForm').classList.add('hidden');
+    document.getElementById('loginForm').classList.remove('hidden');
+    document.getElementById('authTitle').textContent='Ingia SWALI PESA';
+    document.getElementById('authMessage').textContent='';
+  ">
   RUDI LOGIN
+</button>
   </button> 
  </div>
  <p id="authMessage" class="message" aria-live="polite"></p>
