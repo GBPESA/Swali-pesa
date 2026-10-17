@@ -877,8 +877,6 @@ supabase.auth.onAuthStateChange((event, session) => {
   }
 });
 
-initializeApp();
- 
 window.showRegister = function () {
   const loginForm = document.getElementById("loginForm");
   const registerForm = document.getElementById("registerForm");
@@ -914,6 +912,14 @@ window.showLogin = function () {
 
   if (authMessage) authMessage.textContent = "";
 };
+
+supabase.auth.onAuthStateChange((event, session) => {
+  if (event === "SIGNED_OUT") {
+    stopTimer();
+  }
+});
+
+initializeApp();
 
 </script>
 </body>
