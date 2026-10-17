@@ -241,7 +241,17 @@ footer{text-align:center;font-size:12px;padding:18px}
 <footer>SWALI PESA • Linda nenosiri lako.</footer>
  
 
+<script>
+window.addEventListener("error", function (event) {
+  const message = document.getElementById("authMessage");
 
+  if (message) {
+    message.textContent =
+      "Hitilafu ya mfumo: " + event.message;
+    message.className = "message error";
+  }
+});
+</script>
 <script>
 /* WEKA SUPABASE PUBLISHABLE KEY YAKO HAPA.
    USIWEKE service_role key au secret key. */
