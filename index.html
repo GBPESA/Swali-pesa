@@ -94,7 +94,10 @@ footer{text-align:center;font-size:12px;padding:18px}
   <label>Nenosiri</label>
   <input id="loginPassword" type="password" autocomplete="current-password">
   <button class="full" onclick="login()">INGIA</button>
-  <button class="full secondary" onclick="showRegister()">FUNGUA AKAUNTI</button>
+  <button type="button" class="full secondary"
+        onclick="window.showRegister()">
+  FUNGUA AKAUNTI
+  </button>
  </div>
 
  <div id="registerForm" class="hidden">
@@ -109,7 +112,10 @@ footer{text-align:center;font-size:12px;padding:18px}
   <label>Msimbo wa aliyekualika (si lazima)</label>
   <input id="regReferral">
   <button class="full" onclick="registerUser()">JISAJILI</button>
-  <button class="full secondary" onclick="showLogin()">RUDI LOGIN</button>
+  <button type="button" class="full secondary"
+        onclick="window.showLogin()">
+  RUDI LOGIN
+  </button> 
  </div>
  <p id="authMessage" class="message" aria-live="polite"></p>
 </section>
