@@ -839,37 +839,28 @@ footer{text-align:center;font-size:12px;padding:18px}
     button.disabled = true;
     button.textContent = "INATUMA OMBI...";
 
+    https://gbpesa.github.io/Swali-pesa/
     try {
-      const { error } = await client
-        .from("sp_deposits")
-        .insert({
-          user_id: currentUser.id,
-          amount,
-          phone,
-          reference,
-          status: "pending"
-        });
+  const { error } = await client
+    .from("sp_deposits")
+    .insert({
+      user_id: currentUser.id,
+      amount: amount,
+      payer_phone: phone,
+      reference: reference,
+      status: "pending"
+    });
 
-      if (error) throw error;
+  if (error) {
+    throw error;
+  }
 
-      message(
-        "depositMessage",
-        "Ombi limetumwa. Subiri admin athibitishe malipo yako.",
-        "success"
-      );
+  alert("Ombi la kuweka pesa limetumwa kikamilifu!");
 
-      $("depositAmount").value = "";
-      $("payerPhone").value = "";
-      $("depositReference").value = "";
-
-      await loadHistory();
-    } catch (error) {
-      console.error("Deposit:", error);
-
-      message(
-        "depositMessage",
-        "Ombi halijatumwa: " + error.message,
-        "error"
+} catch (error) {
+  console.error("Deposit error:", error);
+  alert("Ombi halijatumwa: " + error.message);
+    }
       );
     } finally {
       button.disabled = false;
