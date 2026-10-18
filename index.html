@@ -754,123 +754,99 @@
     </footer>
   </main>
 
-  
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <script>
 (() => {
   "use strict";
 
-  // SUPABASE YA SWALI PESA
   const SUPABASE_URL = "https://flarulshcdrqmysmtmnb.supabase.co";
   const SUPABASE_KEY = "sb_publishable_GEPP1TIgusFJbfzUd7VVrw_Lg-EgEHv";
 
-  const client = window.supabase.createClient(
+  const db = window.supabase.createClient(
     SUPABASE_URL,
     SUPABASE_KEY
   );
 
-  const $ = id => document.getElementById(id);
-
   let currentUser = null;
   let currentProfile = null;
-  let authBusy = false;
+  let currentWallet = null;
 
-  // =========================
-  // VIFAA VYA UJUMBE
-  // =========================
+  const $ = (id) => document.getElementById(id);
 
-  function message(id, text, type = "") {
+  function showMessage(id, message, isError = false) {
     const element = $(id);
     if (!element) return;
 
-    element.textContent = text || "";
-    element.className = "message" + (type ? " " + type : "");
+    element.textContent = message;
+    element.style.color = isError ? "#c62828" : "#087f5b";
   }
 
-  function money(value) {
-    return Number(value || 0).toLocaleString("en-US") + " TSh";
+  function showSection(id) {
+    ["authSection", "mainSection"].forEach((sectionId) => {
+      const element = $(sectionId);
+      if (element) element.classList.add("hidden");
+    });
+
+    const selected = $(id);
+    if (selected) selected.classList.remove("hidden");
   }
 
-  function formatDate(value) {
-    if (!value) return "-";
+  function showPanel(panelId) {
+    document.querySelectorAll("[data-panel]").forEach((button) => {
+      button.classList.toggle(
+        "active",
+        button.dataset.panel === panelId
+      );
+    });
 
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "-";
+    document.querySelectorAll(
+      "#mainSection .panel"
+    ).forEach((panel) => {
+      panel.classList.add("hidden");
+    });
 
-    return date.toLocaleString("sw-TZ");
+    const panel = $(panelId);
+    if (panel) panel.classList.remove("hidden");
   }
 
-  function setButtonLoading(button, loading, text) {
-    if (!button) return;
-
-    button.disabled = loading;
-
-    if (loading) {
-      button.dataset.oldText = button.textContent;
-      button.textContent = text || "Tafadhali subiri...";
-    } else {
-      button.textContent = button.dataset.oldText || text || "Endelea";
-      delete button.dataset.oldText;
-    }
-  }
-
-  // =========================
-  // KUCHAGUA INGIA AU USAJILI
-  // =========================
-
-  function setAuthMode(mode) {
-    const loginForm = $("loginForm");
-    const registerForm = $("registerForm");
-
-    if (mode === "register") {
-      loginForm?.classList.add("hidden");
-      registerForm?.classList.remove("hidden");
-    } else {
-      registerForm?.classList.add("hidden");
-      loginForm?.classList.remove("hidden");
-    }
-
-    message("authMessage", "");
-  }
-
-  // =========================
-  // USAJILI
-  // =========================
-
-  async function registerUser(event) {
-    event?.preventDefault();
-
-    if (authBusy) return;
-
+  async function registerUser() {
     const fullName = $("registerName")?.value.trim();
     const phone = $("registerPhone")?.value.trim();
     const email = $("registerEmail")?.value.trim();
     const password = $("registerPassword")?.value;
-    const referralCode = $("referralCode")?.value.trim() || null;
+    const referralCode = $("referralCode")?.value.trim();
 
     if (!fullName || !phone || !email || !password) {
-      message("authMessage", "Tafadhali jaza sehemu zote zinazohitajika.", "error");
+      showMessage(
+        "authMessage",
+        "Jaza jina, simu, barua pepe na password.",
+        true
+      );
       return;
     }
 
     if (password.length < 6) {
-      message("authMessage", "Nenosiri lazima liwe na angalau herufi/namba 6.", "error");
+      showMessage(
+        "authMessage",
+        "Password iwe na herufi au namba zisizopungua 6.",
+        true
+      );
       return;
     }
 
     const button = $("registerButton");
-    authBusy = true;
-    setButtonLoading(button, true, "Inasajili...");
+    if (button) button.disabled = true;
 
     try {
-      const { data, error } = await client.auth.signUp({
+      const { data, error } = await db.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: fullName,
-            phone,
-            referral_code: referralCode
+            phone: phone,
+            referral_code: referralCode || null
           }
         }
       });
@@ -878,1241 +854,1430 @@
       if (error) throw error;
 
       if (data.session) {
-        message("authMessage", "Usajili umefanikiwa. Tunafungua akaunti yako...", "success");
-        await loadCurrentAccount(data.user);
-      } else {
-        message(
+        showMessage(
           "authMessage",
-          "Usajili umetumwa. Kama uthibitisho wa barua pepe umewezeshwa, fungua email yako kuthibitisha akaunti kisha ingia.",
-          "success"
+          "Usajili umefanikiwa. Fungua akaunti yako..."
         );
-
-        $("loginEmail").value = email;
-        setAuthMode("login");
+        await bootApp();
+      } else {
+        showMessage(
+          "authMessage",
+          "Usajili umepokelewa. Angalia email yako kuthibitisha akaunti kabla ya kuingia."
+        );
       }
     } catch (error) {
-      console.error("SWALI PESA registration:", error);
-      message("authMessage", "Usajili umeshindikana: " + error.message, "error");
+      showMessage(
+        "authMessage",
+        "Usajili umeshindikana: " + error.message,
+        true
+      );
     } finally {
-      authBusy = false;
-      setButtonLoading(button, false, "JISAJILI");
+      if (button) button.disabled = false;
     }
   }
 
-  // =========================
-  // KUINGIA
-  // =========================
-
-  async function loginUser(event) {
-    event?.preventDefault();
-
-    if (authBusy) return;
-
+  async function loginUser() {
     const email = $("loginEmail")?.value.trim();
     const password = $("loginPassword")?.value;
 
     if (!email || !password) {
-      message("authMessage", "Weka barua pepe na nenosiri.", "error");
+      showMessage(
+        "authMessage",
+        "Weka email na password yako.",
+        true
+      );
       return;
     }
 
     const button = $("loginButton");
-    authBusy = true;
-    setButtonLoading(button, true, "Inaingia...");
+    if (button) button.disabled = true;
 
     try {
-      const { data, error } = await client.auth.signInWithPassword({
+      const { error } = await db.auth.signInWithPassword({
         email,
         password
       });
 
       if (error) throw error;
 
-      await loadCurrentAccount(data.user);
-      message("authMessage", "");
+      await bootApp();
     } catch (error) {
-      console.error("SWALI PESA login:", error);
-      message("authMessage", "Kuingia kumeshindikana: " + error.message, "error");
-    } finally {
-      authBusy = false;
-      setButtonLoading(button, false, "INGIA");
-    }
-  }
-
-  // =========================
-  // KUPAKIA WASIFU NA AKAUNTI
-  // =========================
-
-  async function loadCurrentAccount(user) {
-    if (!user) {
-      showAuth();
-      return;
-    }
-
-    currentUser = user;
-
-    const { data: profile, error } = await client
-      .from("sp_profiles")
-      .select("*")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (error) {
-      console.error("SWALI PESA profile:", error);
-      throw new Error("Imeshindikana kusoma wasifu: " + error.message);
-    }
-
-    if (!profile) {
-      throw new Error(
-        "Wasifu haujapatikana. Hakikisha trigger ya kutengeneza sp_profiles na sp_wallets ipo kwenye Supabase."
+      showMessage(
+        "authMessage",
+        "Kuingia kumeshindikana: " + error.message,
+        true
       );
-    }
-
-    currentProfile = profile;
-
-    $("welcomeName").textContent = profile.full_name || user.email || "Mtumiaji";
-    $("userEmail").textContent = user.email || "";
-    $("profileName").value = profile.full_name || "";
-    $("profilePhone").value = profile.phone || "";
-    $("profileReferralCode").value = profile.referral_code || "";
-
-    $("depositPayNumber").textContent = "0702715377";
-
-    if (profile.role === "admin") {
-      $("adminTab").classList.remove("hidden");
-    } else {
-      $("adminTab").classList.add("hidden");
-    }
-
-    $("authSection").classList.add("hidden");
-    $("mainSection").classList.remove("hidden");
-
-    await loadWallet();
-    showPanel("quizPanel");
-  }
-
-  function showAuth() {
-    currentUser = null;
-    currentProfile = null;
-
-    $("mainSection")?.classList.add("hidden");
-    $("authSection")?.classList.remove("hidden");
-
-    setAuthMode("login");
-  }
-
-  // =========================
-  // KUSOMA SALIO
-  // =========================
-
-  async function loadWallet() {
-    if (!currentUser) return;
-
-    const { data, error } = await client
-      .from("sp_wallets")
-      .select("balance,total_earned")
-      .eq("user_id", currentUser.id)
-      .maybeSingle();
-
-    if (error) {
-      console.error("SWALI PESA wallet:", error);
-      message("questionMessage", "Imeshindikana kupakia salio: " + error.message, "error");
-      return;
-    }
-
-    if (!data) {
-      message("questionMessage", "Akaunti hii haina wallet. Kagua trigger ya wallet kwenye Supabase.", "error");
-      return;
-    }
-
-    $("walletBalance").textContent = money(data.balance);
-    $("walletEarned").textContent = money(data.total_earned);
-  }
-
-  // =========================
-  // KUFUNGUA KURASA
-  // =========================
-
-  function showPanel(panelId) {
-    document.querySelectorAll("[data-panel-content]").forEach(panel => {
-      panel.classList.add("hidden");
-    });
-
-    document.querySelectorAll("[data-panel]").forEach(button => {
-      button.classList.remove("active");
-    });
-
-    const panel = $(panelId);
-    if (panel) panel.classList.remove("hidden");
-
-    const navButton = document.querySelector(`[data-panel="${panelId}"]`);
-    navButton?.classList.add("active");
-
-    if (panelId === "historyPanel") loadHistory();
-    if (panelId === "depositPanel") loadMyDeposits();
-    if (panelId === "withdrawPanel") loadMyWithdrawals();
-
-    if (panelId === "adminPanel" && currentProfile?.role === "admin") {
-      loadAdminQuestions();
-      loadAdminDeposits();
-      loadAdminWithdrawals();
+    } finally {
+      if (button) button.disabled = false;
     }
   }
-
-  // =========================
-  // KUTOKA KWENYE AKAUNTI
-  // =========================
 
   async function logoutUser() {
-    const button = $("logoutButton");
-    setButtonLoading(button, true, "Inatoka...");
+    const { error } = await db.auth.signOut();
 
-    try {
-      const { error } = await client.auth.signOut();
-      if (error) throw error;
-
-      showAuth();
-    } catch (error) {
-      console.error("SWALI PESA logout:", error);
+    if (error) {
       alert("Imeshindikana kutoka: " + error.message);
-    } finally {
-      setButtonLoading(button, false, "TOKA KWENYE AKAUNTI");
-    }
-  }
-
-  // =========================
-  // KUUNGANISHA VITufe
-  // =========================
-
-  function bindBaseEvents() {
-    $("showLoginButton").addEventListener("click", () => setAuthMode("login"));
-    $("showRegisterButton").addEventListener("click", () => setAuthMode("register"));
-
-    $("loginForm").addEventListener("submit", loginUser);
-    $("registerForm").addEventListener("submit", registerUser);
-
-    $("logoutButton").addEventListener("click", logoutUser);
-    $("reloadWalletButton").addEventListener("click", loadWallet);
-
-    document.querySelectorAll("[data-panel]").forEach(button => {
-      button.addEventListener("click", () => {
-        const panelId = button.dataset.panel;
-
-        if (panelId === "adminPanel" && currentProfile?.role !== "admin") {
-          alert("Huna ruhusa ya admin.");
-          return;
-        }
-
-        showPanel(panelId);
-      });
-    });
-  }
-
-  // =========================
-  // KUANZISHA APP
-  // =========================
-
-  async function bootApp() {
-    bindBaseEvents();
-    setAuthMode("login");
-
-    try {
-      const { data, error } = await client.auth.getSession();
-      if (error) throw error;
-
-      if (data.session?.user) {
-        try {
-          await loadCurrentAccount(data.session.user);
-        } catch (profileError) {
-          console.error(profileError);
-          message("authMessage", profileError.message, "error");
-          showAuth();
-        }
-      } else {
-        showAuth();
-      }
-    } catch (error) {
-      console.error("SWALI PESA startup:", error);
-      showAuth();
-      message("authMessage", "Imeshindikana kuanzisha mfumo: " + error.message, "error");
-    }
-  }
-
-  // =========================
-  // VITENDEO VYA SEHEMU ZINAZOFUATA
-  // =========================
-
-  // Sehemu ya 3 itaongeza kazi za maswali, deposit,
-  // withdrawal, historia na paneli ya admin.
-  // Sehemu ya 4 itakamilisha referral na kufunga faili.
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", bootApp);
-  } else {
-    bootApp();
-  }
-
-  
-<!-- SEHEMU YA 3: MASWALI, HISTORIA NA ADMIN -->
-<script>
-/* Bandika code hii ndani ya script ya SEHEMU YA 2,
-   kabla ya mstari wa mwisho </script>. */
-
-let spQuestions = [];
-let spQuestionIndex = 0;
-let spQuestionTimer = null;
-let spSecondsLeft = 120;
-let spQuestionBusy = false;
-
-function spEscapeHTML(value) {
-  return String(value ?? "").replace(/[&<>"']/g, function (c) {
-    return {
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#39;"
-    }[c];
-  });
-}
-
-function spStopQuestionTimer() {
-  if (spQuestionTimer) {
-    clearInterval(spQuestionTimer);
-    spQuestionTimer = null;
-  }
-}
-
-function spStartQuestionTimer(seconds) {
-  spStopQuestionTimer();
-  spSecondsLeft = Number(seconds) || 120;
-
-  const timer = $("questionTimer");
-  if (timer) timer.textContent = spSecondsLeft + " sekunde";
-
-  spQuestionTimer = setInterval(async function () {
-    spSecondsLeft--;
-
-    if (timer) {
-      timer.textContent = Math.max(0, spSecondsLeft) + " sekunde";
-    }
-
-    if (spSecondsLeft <= 0) {
-      spStopQuestionTimer();
-      const area = $("questionArea");
-      if (area) {
-        area.innerHTML =
-          '<p class="message">Muda umeisha. Bonyeza ANZA MASWALI kujaribu tena.</p>';
-      }
-      const btn = $("startQuestionButton");
-      if (btn) btn.disabled = false;
-    }
-  }, 1000);
-}
-
-function spShowCurrentQuestion() {
-  const area = $("questionArea");
-  const startButton = $("startQuestionButton");
-
-  if (!area) return;
-
-  if (spQuestionIndex >= spQuestions.length) {
-    spStopQuestionTimer();
-    area.innerHTML =
-      '<p class="message">Umemaliza maswali yote yaliyopatikana kwa jaribio hili.</p>';
-    if (startButton) startButton.disabled = false;
-    if (typeof loadWallet === "function") awaitLoadWalletSafe();
-    return;
-  }
-
-  const q = spQuestions[spQuestionIndex];
-  const options = Array.isArray(q.options) ? q.options : [];
-
-  if (!options.length) {
-    area.innerHTML =
-      '<p class="message">Swali hili halina chaguo la majibu. Tafadhali wasiliana na Admin.</p>';
-    return;
-  }
-
-  area.innerHTML = `
-    <div class="question-card">
-      <p><strong>Swali ${spQuestionIndex + 1} kati ya ${spQuestions.length}</strong></p>
-      <h3>${spEscapeHTML(q.question)}</h3>
-      <form id="spAnswerForm">
-        ${options.map((option, index) => `
-          <label class="option-row">
-            <input type="radio" name="spSelectedOption"
-                   value="${index}" required>
-            ${spEscapeHTML(option)}
-          </label>
-        `).join("")}
-        <button type="submit" id="spSubmitAnswerButton">
-          WASILISHA JIBU
-        </button>
-      </form>
-    </div>
-  `;
-
-  const form = $("spAnswerForm");
-  if (form) {
-    form.addEventListener("submit", submitSpAnswer);
-  }
-}
-
-async function awaitLoadWalletSafe() {
-  try {
-    if (typeof loadWallet === "function") await loadWallet();
-  } catch (error) {
-    console.error("Wallet:", error);
-  }
-}
-
-async function startSpQuestions() {
-  if (!currentUser) {
-    message("questionMessage", "Tafadhali ingia kwenye akaunti yako kwanza.");
-    return;
-  }
-
-  const button = $("startQuestionButton");
-  const area = $("questionArea");
-
-  if (button) button.disabled = true;
-  if (area) area.innerHTML = "<p>Inapakia maswali...</p>";
-  message("questionMessage", "");
-
-  try {
-    const { data, error } = await client.rpc("sp_start_question");
-
-    if (error) throw error;
-
-    if (!data || data.success === false) {
-      throw new Error(data?.message || "Imeshindikana kuanza maswali.");
-    }
-
-    spQuestions = Array.isArray(data.questions) ? data.questions : [];
-    spQuestionIndex = 0;
-
-    if (!spQuestions.length) {
-      if (area) area.innerHTML = "<p>Hakuna maswali yaliyopatikana kwa sasa.</p>";
-      if (button) button.disabled = false;
       return;
     }
 
-    const seconds = Number(data.seconds) || 120;
-    spStartQuestionTimer(seconds);
-    spShowCurrentQuestion();
-  } catch (error) {
-    console.error(error);
-    if (area) area.innerHTML = "";
-    message("questionMessage", error.message || "Imeshindikana kupakia maswali.");
-    if (button) button.disabled = false;
-  }
-}
+    currentUser = null;
+    currentProfile = null;
+    currentWallet = null;
 
-async function submitSpAnswer(event) {
-  event.preventDefault();
-
-  if (spQuestionBusy) return;
-
-  const selected = document.querySelector(
-    'input[name="spSelectedOption"]:checked'
-  );
-
-  if (!selected) {
-    message("questionMessage", "Chagua jibu kwanza.");
-    return;
+    showSection("authSection");
   }
 
-  const question = spQuestions[spQuestionIndex];
-  if (!question || !question.question_id) {
-    message("questionMessage", "Swali halijatambulika. Anza tena.");
-    return;
-  }
-
-  spQuestionBusy = true;
-
-  const button = $("spSubmitAnswerButton");
-  if (button) button.disabled = true;
-
-  try {
-    const { data, error } = await client.rpc("sp_submit_answer", {
-      p_question_id: question.question_id,
-      p_selected_option: Number(selected.value)
-    });
-
-    if (error) throw error;
-
-    if (!data || data.success === false) {
-      throw new Error(data?.message || "Jibu halikupokelewa.");
-    }
-
-    message(
-      "questionMessage",
-      data.message || (data.is_correct ? "Jibu ni sahihi." : "Jibu si sahihi.")
-    );
-
-    spQuestionIndex++;
-
-    if (spQuestionIndex < spQuestions.length) {
-      spShowCurrentQuestion();
-    } else {
-      spStopQuestionTimer();
-      const area = $("questionArea");
-      if (area) {
-        area.innerHTML =
-          '<p class="message">Hongera! Umemaliza maswali ya jaribio hili.</p>';
-      }
-      const startButton = $("startQuestionButton");
-      if (startButton) startButton.disabled = false;
-      await awaitLoadWalletSafe();
-    }
-  } catch (error) {
-    console.error(error);
-    message("questionMessage", error.message || "Imeshindikana kutuma jibu.");
-    if (button) button.disabled = false;
-  } finally {
-    spQuestionBusy = false;
-  }
-}
-
-/* ADMIN: KUUNDA SWALI */
-async function createSpQuestion(event) {
-  if (event) event.preventDefault();
-
-  if (!currentUser || !currentProfile || currentProfile.role !== "admin") {
-    message("adminQuestionMessage", "Huna ruhusa ya kufanya kazi hii.");
-    return;
-  }
-
-  const question = $("adminQuestion")?.value.trim();
-  const options = [
-    $("opt0")?.value.trim(),
-    $("opt1")?.value.trim(),
-    $("opt2")?.value.trim(),
-    $("opt3")?.value.trim()
-  ];
-  const correctOption = Number($("correctOption")?.value);
-
-  if (!question || options.some(option => !option)) {
-    message("adminQuestionMessage", "Jaza swali na chaguo zote nne.");
-    return;
-  }
-
-  const button = $("createQuestionButton");
-  if (button) button.disabled = true;
-
-  try {
-    const { data, error } = await client.rpc("sp_admin_create_question", {
-      p_question_text: question,
-      p_options: options,
-      p_correct_option: correctOption
-    });
-
-    if (error) throw error;
-
-    if (data && data.success === false) {
-      throw new Error(data.message || "Swali halikuundwa.");
-    }
-
-    message("adminQuestionMessage", "Swali limetumwa kwa mafanikio.");
-    $("adminQuestion").value = "";
-    ["opt0", "opt1", "opt2", "opt3"].forEach(id => {
-      if ($(id)) $(id).value = "";
-    });
-
-    await loadSpAdminQuestions();
-  } catch (error) {
-    console.error(error);
-    message("adminQuestionMessage", error.message || "Imeshindikana kuunda swali.");
-  } finally {
-    if (button) button.disabled = false;
-  }
-}
-
-/* ADMIN: ORODHA YA MASWALI */
-async function loadSpAdminQuestions() {
-  const list = $("adminQuestionsList");
-  if (!list) return;
-
-  if (!currentUser || !currentProfile || currentProfile.role !== "admin") {
-    list.innerHTML = "<p>Sehemu hii ni ya Admin pekee.</p>";
-    return;
-  }
-
-  list.innerHTML = "<p>Inapakia maswali...</p>";
-
-  try {
-    const { data, error } = await client.rpc("sp_admin_list_questions");
-    if (error) throw error;
-
-    const questions = Array.isArray(data) ? data : (data?.questions || []);
-
-    if (!questions.length) {
-      list.innerHTML = "<p>Bado hakuna maswali.</p>";
-      return;
-    }
-
-    list.innerHTML = questions.map((q, index) => `
-      <div class="history-item">
-        <strong>Swali ${index + 1}</strong>
-        <p>${spEscapeHTML(q.question_text || q.question || "")}</p>
-      </div>
-    `).join("");
-  } catch (error) {
-    console.error(error);
-    list.innerHTML =
-      `<p>Hitilafu: ${spEscapeHTML(error.message || "Imeshindikana kupakia maswali.")}</p>`;
-  }
-}
-
-/* HISTORIA YA MIAMALA */
-async function loadHistory() {
-  const list = $("historyList");
-  if (!list || !currentUser) return;
-
-  list.innerHTML = "<p>Inapakia historia...</p>";
-
-  try {
-    const { data, error } = await client
-      .from("sp_transactions")
-      .select("*")
-      .eq("user_id", currentUser.id)
-      .order("created_at", { ascending: false })
-      .limit(50);
-
-    if (error) throw error;
-
-    if (!data || !data.length) {
-      list.innerHTML = "<p>Bado huna miamala.</p>";
-      return;
-    }
-
-    list.innerHTML = data.map(item => `
-      <div class="history-item">
-        <strong>${spEscapeHTML(item.type || "Muamala")}</strong>
-        <p>Kiasi: TSh ${spEscapeHTML(money(item.amount))}</p>
-        <p>Hali: ${spEscapeHTML(item.status || "—")}</p>
-        <p>Maelezo: ${spEscapeHTML(item.description || "—")}</p>
-        <small>${spEscapeHTML(formatDate(item.created_at))}</small>
-      </div>
-    `).join("");
-  } catch (error) {
-    console.error(error);
-    list.innerHTML =
-      `<p>Hitilafu ya historia: ${spEscapeHTML(error.message || "Jaribu tena.")}</p>`;
-  }
-}
-
-/* VIFUNGO VYA SEHEMU YA 3 */
-function bindSpPart3Events() {
-  const startButton = $("startQuestionButton");
-  if (startButton) startButton.addEventListener("click", startSpQuestions);
-
-  const createButton = $("createQuestionButton");
-  if (createButton) createButton.addEventListener("click", createSpQuestion);
-
-  const reloadQuestions = $("reloadAdminQuestionsButton");
-  if (reloadQuestions) {
-    reloadQuestions.addEventListener("click", loadSpAdminQuestions);
-  }
-
-  const reloadHistory = $("reloadHistoryButton");
-  if (reloadHistory) {
-    reloadHistory.addEventListener("click", loadHistory);
-  }
-}
-
-bindSpPart3Events();
-
-
-/* ==============================
-   SEHEMU YA 4: DEPOSIT NA WITHDRAW
-   ============================== */
-
-/* KUOMBA KUWEKA PESA */
-async function submitSpDeposit(event) {
-  if (event) event.preventDefault();
-
-  if (!currentUser) {
-    message("depositMessage", "Tafadhali ingia kwanza.");
-    return;
-  }
-
-  const amount = Number($("depositAmount")?.value);
-  const payerPhone = $("payerPhone")?.value.trim();
-  const reference = $("depositReference")?.value.trim();
-
-  if (!Number.isFinite(amount) || amount <= 0) {
-    message("depositMessage", "Weka kiasi sahihi cha pesa.");
-    return;
-  }
-
-  if (!payerPhone || !reference) {
-    message("depositMessage", "Jaza namba uliyolipia na kumbukumbu ya muamala.");
-    return;
-  }
-
-  const button = $("submitDepositButton");
-  if (button) button.disabled = true;
-
-  try {
-    /*
-      Tunatumia payer_phone badala ya phone kwa sababu
-      ombi la awali lilirudisha kosa kuwa sp_deposits
-      haina column ya phone.
-
-      Hakikisha majina haya yanafanana na columns
-      halisi za sp_deposits katika Supabase.
-    */
-    const { data, error } = await client
-      .from("sp_deposits")
-      .insert({
-        user_id: currentUser.id,
-        amount: amount,
-        payer_phone: payerPhone,
-        reference: reference,
-        status: "pending"
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    message(
-      "depositMessage",
-      "Ombi limetumwa. Subiri Admin athibitishe malipo yako."
-    );
-
-    if ($("depositAmount")) $("depositAmount").value = "";
-    if ($("payerPhone")) $("payerPhone").value = "";
-    if ($("depositReference")) $("depositReference").value = "";
-
-    await loadSpMyDeposits();
-  } catch (error) {
-    console.error("Deposit error:", error);
-    message(
-      "depositMessage",
-      "Ombi halijatumwa: " + (error.message || "Kosa lisilojulikana.")
-    );
-  } finally {
-    if (button) button.disabled = false;
-  }
-}
-
-/* HISTORIA YA MAOMBI YA KUWEKA PESA */
-async function loadSpMyDeposits() {
-  const list = $("myDepositsList");
-  if (!list || !currentUser) return;
-
-  list.innerHTML = "<p>Inapakia maombi...</p>";
-
-  try {
-    const { data, error } = await client
-      .from("sp_deposits")
-      .select("*")
-      .eq("user_id", currentUser.id)
-      .order("created_at", { ascending: false })
-      .limit(30);
-
-    if (error) throw error;
-
-    if (!data || data.length === 0) {
-      list.innerHTML = "<p>Bado hujatuma ombi la kuweka pesa.</p>";
-      return;
-    }
-
-    list.innerHTML = data.map(row => `
-      <div class="history-item">
-        <strong>TSh ${spEscapeHTML(money(row.amount))}</strong>
-        <p>Hali: ${spEscapeHTML(row.status || "pending")}</p>
-        <p>Kumbukumbu: ${spEscapeHTML(row.reference || "—")}</p>
-        <small>${spEscapeHTML(formatDate(row.created_at))}</small>
-      </div>
-    `).join("");
-  } catch (error) {
-    console.error(error);
-    list.innerHTML =
-      `<p>Imeshindikana kupakia maombi: ${spEscapeHTML(error.message)}</p>`;
-  }
-}
-
-/* KUOMBA KUTOA PESA */
-async function submitSpWithdrawal(event) {
-  if (event) event.preventDefault();
-
-  if (!currentUser) {
-    message("withdrawMessage", "Tafadhali ingia kwanza.");
-    return;
-  }
-
-  const amount = Number($("withdrawAmount")?.value);
-  const phone = $("withdrawPhone")?.value.trim();
-
-  if (!Number.isFinite(amount) || amount <= 0) {
-    message("withdrawMessage", "Weka kiasi sahihi cha kutoa.");
-    return;
-  }
-
-  if (!phone) {
-    message("withdrawMessage", "Weka namba ya simu ya kupokea pesa.");
-    return;
-  }
-
-  const button = $("submitWithdrawalButton");
-  if (button) button.disabled = true;
-
-  try {
-    const { data, error } = await client.rpc("sp_request_withdrawal", {
-      p_amount: amount,
-      p_phone: phone
-    });
-
-    if (error) throw error;
-
-    if (data && data.success === false) {
-      throw new Error(data.message || "Ombi la kutoa pesa limekataliwa.");
-    }
-
-    message(
-      "withdrawMessage",
-      data?.message || "Ombi limetumwa. Subiri Admin alikague."
-    );
-
-    if ($("withdrawAmount")) $("withdrawAmount").value = "";
-
-    await loadWallet();
-    await loadSpMyWithdrawals();
-  } catch (error) {
-    console.error("Withdrawal error:", error);
-    message(
-      "withdrawMessage",
-      "Ombi halijafanikiwa: " + (error.message || "Jaribu tena.")
-    );
-  } finally {
-    if (button) button.disabled = false;
-  }
-}
-
-/* HISTORIA YA MAOMBI YA KUTOA PESA */
-async function loadSpMyWithdrawals() {
-  const list = $("myWithdrawalsList");
-  if (!list || !currentUser) return;
-
-  list.innerHTML = "<p>Inapakia maombi...</p>";
-
-  try {
-    const { data, error } = await client
-      .from("sp_withdrawals")
-      .select("*")
-      .eq("user_id", currentUser.id)
-      .order("created_at", { ascending: false })
-      .limit(30);
-
-    if (error) throw error;
-
-    if (!data || data.length === 0) {
-      list.innerHTML = "<p>Bado hujaomba kutoa pesa.</p>";
-      return;
-    }
-
-    list.innerHTML = data.map(row => `
-      <div class="history-item">
-        <strong>TSh ${spEscapeHTML(money(row.amount))}</strong>
-        <p>Namba: ${spEscapeHTML(row.phone || "—")}</p>
-        <p>Hali: ${spEscapeHTML(row.status || "pending")}</p>
-        <p>Maelezo ya Admin: ${spEscapeHTML(row.admin_note || "—")}</p>
-        <small>${spEscapeHTML(formatDate(row.created_at))}</small>
-      </div>
-    `).join("");
-  } catch (error) {
-    console.error(error);
-    list.innerHTML =
-      `<p>Imeshindikana kupakia maombi: ${spEscapeHTML(error.message)}</p>`;
-  }
-}
-
-/* ADMIN: ORODHA YA MAOMBI YA KUWEKA PESA */
-async function loadSpAdminDeposits() {
-  const list = $("adminDepositsList");
-  if (!list) return;
-
-  if (!currentUser || !currentProfile || currentProfile.role !== "admin") {
-    list.innerHTML = "<p>Sehemu hii ni ya Admin pekee.</p>";
-    return;
-  }
-
-  list.innerHTML = "<p>Inapakia maombi...</p>";
-
-  try {
-    /*
-      Orodha hii hutegemea RLS/ruhusa za Admin kwenye
-      Supabase. Ikiwa sera haziruhusu, lazima zirekebishwe
-      kwenye database; usizime RLS kwa watumiaji wote.
-    */
-    const { data, error } = await client
-      .from("sp_deposits")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(100);
-
-    if (error) throw error;
-
-    if (!data || data.length === 0) {
-      list.innerHTML = "<p>Hakuna maombi ya kuweka pesa.</p>";
-      return;
-    }
-
-    list.innerHTML = data.map(row => `
-      <div class="history-item">
-        <strong>TSh ${spEscapeHTML(money(row.amount))}</strong>
-        <p>Mtumiaji: ${spEscapeHTML(row.user_id || "—")}</p>
-        <p>Namba: ${spEscapeHTML(row.payer_phone || "—")}</p>
-        <p>Kumbukumbu: ${spEscapeHTML(row.reference || "—")}</p>
-        <p>Hali: ${spEscapeHTML(row.status || "pending")}</p>
-        <small>${spEscapeHTML(formatDate(row.created_at))}</small>
-      </div>
-    `).join("");
-  } catch (error) {
-    console.error(error);
-    list.innerHTML =
-      `<p>Hitilafu: ${spEscapeHTML(error.message || "Imeshindikana kupakia maombi.")}</p>`;
-  }
-}
-
-/* ADMIN: ORODHA YA MAOMBI YA KUTOA PESA */
-async function loadSpAdminWithdrawals() {
-  const list = $("adminWithdrawalsList");
-  if (!list) return;
-
-  if (!currentUser || !currentProfile || currentProfile.role !== "admin") {
-    list.innerHTML = "<p>Sehemu hii ni ya Admin pekee.</p>";
-    return;
-  }
-
-  list.innerHTML = "<p>Inapakia maombi...</p>";
-
-  try {
-    const { data, error } = await client.rpc("sp_admin_list_withdrawals");
-    if (error) throw error;
-
-    const rows = Array.isArray(data) ? data : (data?.withdrawals || []);
-
-    if (!rows.length) {
-      list.innerHTML = "<p>Hakuna maombi ya kutoa pesa.</p>";
-      return;
-    }
-
-    list.innerHTML = rows.map(row => `
-      <div class="history-item">
-        <strong>TSh ${spEscapeHTML(money(row.amount))}</strong>
-        <p>Mtumiaji: ${spEscapeHTML(row.user_id || "—")}</p>
-        <p>Namba: ${spEscapeHTML(row.phone || "—")}</p>
-        <p>Hali: ${spEscapeHTML(row.status || "pending")}</p>
-        <p>Maelezo: ${spEscapeHTML(row.admin_note || "—")}</p>
-      </div>
-    `).join("");
-  } catch (error) {
-    console.error(error);
-    list.innerHTML =
-      `<p>Hitilafu: ${spEscapeHTML(error.message || "Imeshindikana kupakia maombi.")}</p>`;
-  }
-}
-
-/* KUUNGANISHA VITENZI VYA SEHEMU YA 4 */
-function bindSpPart4Events() {
-  const depositButton = $("submitDepositButton");
-  if (depositButton) {
-    depositButton.addEventListener("click", submitSpDeposit);
-  }
-
-  const withdrawalButton = $("submitWithdrawalButton");
-  if (withdrawalButton) {
-    withdrawalButton.addEventListener("click", submitSpWithdrawal);
-  }
-
-  const reloadDeposits = $("reloadMyDepositsButton");
-  if (reloadDeposits) {
-    reloadDeposits.addEventListener("click", loadSpMyDeposits);
-  }
-
-  const reloadWithdrawals = $("reloadMyWithdrawalsButton");
-  if (reloadWithdrawals) {
-    reloadWithdrawals.addEventListener("click", loadSpMyWithdrawals);
-  }
-
-  const adminDeposits = $("reloadAdminDepositsButton");
-  if (adminDeposits) {
-    adminDeposits.addEventListener("click", loadSpAdminDeposits);
-  }
-
-  const adminWithdrawals = $("reloadAdminWithdrawalsButton");
-  if (adminWithdrawals) {
-    adminWithdrawals.addEventListener("click", loadSpAdminWithdrawals);
-  }
-}
-
-bindSpPart4Events();
-
-/* HAKIKISHA MAOMBI YANAPAKIWA UKIFUNGUA PANELI */
-const spOriginalShowPanel = showPanel;
-
-showPanel = function (panelId) {
-  spOriginalShowPanel(panelId);
-
-  if (panelId === "depositPanel") loadSpMyDeposits();
-  if (panelId === "withdrawPanel") loadSpMyWithdrawals();
-  if (panelId === "adminPanel") {
-    loadSpAdminDeposits();
-    loadSpAdminWithdrawals();
-    loadSpAdminQuestions();
-  }
-};
-
-
-/* =================================
-   SEHEMU YA 5: PROFILE NA REFERRAL
-   ================================= */
-
-/* PAKIA TAARIFA ZA PROFILE */
-async function loadSpProfile() {
-  if (!currentUser) return;
-
-  try {
-    const { data, error } = await client
+  async function loadProfile() {
+    const { data, error } = await db
       .from("sp_profiles")
       .select("*")
       .eq("id", currentUser.id)
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
 
     currentProfile = data;
 
-    if ($("profileName")) {
-      $("profileName").textContent = data.full_name || "Mtumiaji";
-    }
-
-    if ($("profilePhone")) {
-      $("profilePhone").textContent = data.phone || "Haijawekwa";
-    }
-
-    if ($("profileReferralCode")) {
-      $("profileReferralCode").textContent =
-        data.referral_code || "Hakuna msimbo";
-    }
-
     if ($("welcomeName")) {
-      $("welcomeName").textContent = data.full_name || "Mtumiaji";
+      $("welcomeName").textContent =
+        data?.full_name || currentUser.email || "Mtumiaji";
     }
 
     if ($("userEmail")) {
       $("userEmail").textContent = currentUser.email || "";
     }
 
+    if ($("profileName")) {
+      $("profileName").value = data?.full_name || "";
+    }
+
+    if ($("profilePhone")) {
+      $("profilePhone").value = data?.phone || "";
+    }
+
+    if ($("profileReferralCode")) {
+      $("profileReferralCode").value =
+        data?.referral_code || "";
+    }
+
     const adminTab = $("adminTab");
     if (adminTab) {
-      adminTab.style.display = data.role === "admin" ? "" : "none";
-    }
-  } catch (error) {
-    console.error("Profile error:", error);
-    message(
-      "profileMessage",
-      "Imeshindikana kupakia profile: " +
-        (error.message || "Jaribu tena.")
-    );
-  }
-}
-
-/* NAKILI REFERRAL CODE */
-async function copySpReferralCode() {
-  const code = $("profileReferralCode")?.textContent?.trim();
-
-  if (!code || code === "Hakuna msimbo") {
-    message("profileMessage", "Msimbo wa mwaliko haujapatikana.");
-    return;
-  }
-
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(code);
-    } else {
-      const temp = document.createElement("textarea");
-      temp.value = code;
-      temp.style.position = "fixed";
-      temp.style.opacity = "0";
-      document.body.appendChild(temp);
-      temp.select();
-
-      const copied = document.execCommand("copy");
-      temp.remove();
-
-      if (!copied) throw new Error("Simu haikunakili msimbo.");
+      adminTab.classList.toggle(
+        "hidden",
+        data?.role !== "admin"
+      );
     }
 
-    message("profileMessage", "Msimbo umenakiliwa: " + code);
-  } catch (error) {
-    console.error(error);
-    message(
-      "profileMessage",
-      "Imeshindikana kunakili. Tafadhali nakili msimbo mwenyewe: " + code
-    );
-  }
-}
-
-/* SHIRIKI MWALIKO WHATSAPP */
-function inviteSpFriend() {
-  const code = $("profileReferralCode")?.textContent?.trim();
-
-  if (!code || code === "Hakuna msimbo") {
-    message("profileMessage", "Msimbo wa mwaliko haujapatikana.");
-    return;
+    const adminPanel = $("adminPanel");
+    if (adminPanel && data?.role !== "admin") {
+      adminPanel.classList.add("hidden");
+    }
   }
 
-  const appUrl = window.location.href.split("#")[0];
-  const inviteText =
-    "Karibu SWALI PESA! Jiunge na mfumo wetu wa maswali. " +
-    "Tumia msimbo wangu wa mwaliko: " + code +
-    "\nFungua hapa: " + appUrl;
+  async function loadWallet() {
+    const { data, error } = await db
+      .from("sp_wallets")
+      .select("*")
+      .eq("user_id", currentUser.id)
+      .maybeSingle();
 
-  const whatsappUrl =
-    "https://wa.me/?text=" + encodeURIComponent(inviteText);
+    if (error) throw error;
 
-  window.open(whatsappUrl, "_blank", "noopener,noreferrer");
-}
+    currentWallet = data;
 
-/* ONYESHA PROFILE KILA UKIFUNGUA */
-const spPreviousShowPanel = showPanel;
-
-showPanel = function (panelId) {
-  spPreviousShowPanel(panelId);
-
-  if (panelId === "profilePanel") {
-    loadSpProfile();
-  }
-};
-
-/* UNGANISHA VITENZI VYA PROFILE */
-function bindSpPart5Events() {
-  const copyButton = $("copyReferralButton");
-  if (copyButton) {
-    copyButton.addEventListener("click", copySpReferralCode);
-  }
-
-  const inviteButton = $("inviteFriendButton");
-  if (inviteButton) {
-    inviteButton.addEventListener("click", inviteSpFriend);
-  }
-}
-
-bindSpPart5Events();
-
-
-/* ====================================
-   SEHEMU YA 6: SALIO NA KUMALIZIA
-   ==================================== */
-
-/* NAMBA RASMI YA MALIPO */
-const SP_PAYMENT_NUMBER = "0702715377";
-const SP_SUPPORT_NUMBER = "255717729730";
-
-/* ONYESHA NAMBA YA MALIPO */
-function setupSpPaymentNumber() {
-  const numberElement = $("depositPayNumber");
-
-  if (numberElement) {
-    numberElement.textContent = SP_PAYMENT_NUMBER;
-  }
-}
-
-/* NAKILI NAMBA YA MALIPO */
-async function copySpPaymentNumber() {
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(SP_PAYMENT_NUMBER);
-    } else {
-      const temp = document.createElement("textarea");
-      temp.value = SP_PAYMENT_NUMBER;
-      temp.style.position = "fixed";
-      temp.style.opacity = "0";
-      document.body.appendChild(temp);
-      temp.select();
-
-      const copied = document.execCommand("copy");
-      temp.remove();
-
-      if (!copied) throw new Error("Kunakili kumeshindikana.");
+    if ($("walletBalance")) {
+      $("walletBalance").textContent =
+        Number(data?.balance || 0).toLocaleString("en-US") +
+        " TSh";
     }
 
-    message("depositMessage", "Namba ya malipo imenakiliwa.");
-  } catch (error) {
-    message(
-      "depositMessage",
-      "Tumia namba hii kulipia: " + SP_PAYMENT_NUMBER
-    );
-  }
-}
-
-/* WASILIANA NA MSAADA WA WHATSAPP */
-function openSpSupport() {
-  const text = encodeURIComponent(
-    "Habari, nahitaji msaada kuhusu SWALI PESA."
-  );
-
-  window.open(
-    "https://wa.me/" + SP_SUPPORT_NUMBER + "?text=" + text,
-    "_blank",
-    "noopener,noreferrer"
-  );
-}
-
-/* SASISHA TAARIFA ZA AKAUNTI */
-async function refreshSpAccount() {
-  if (!currentUser) return;
-
-  try {
-    await loadSpProfile();
-    await loadWallet();
-  } catch (error) {
-    console.error("Account refresh:", error);
-  }
-}
-
-/* UNGANISHA VITENZI VYA SEHEMU YA 6 */
-function bindSpPart6Events() {
-  setupSpPaymentNumber();
-
-  const payNumber = $("depositPayNumber");
-
-  if (payNumber) {
-    payNumber.style.cursor = "pointer";
-    payNumber.title = "Bonyeza kunakili namba ya malipo";
-    payNumber.addEventListener("click", copySpPaymentNumber);
+    if ($("walletEarned")) {
+      $("walletEarned").textContent =
+        Number(data?.total_earned || 0).toLocaleString("en-US") +
+        " TSh";
+    }
   }
 
-  const supportButtons = document.querySelectorAll(
-    "[data-sp-support]"
-  );
+  async function bootApp() {
+    try {
+      const { data, error } = await db.auth.getSession();
 
-  supportButtons.forEach(button => {
-    button.addEventListener("click", openSpSupport);
+      if (error) throw error;
+
+      currentUser = data.session?.user || null;
+
+      if (!currentUser) {
+        showSection("authSection");
+        return;
+      }
+
+      showSection("mainSection");
+
+      await loadProfile();
+      await loadWallet();
+
+      showPanel("quizPanel");
+    } catch (error) {
+      showSection("authSection");
+      showMessage(
+        "authMessage",
+        "Imeshindwa kufungua akaunti: " + error.message,
+        true
+      );
+    }
+  }
+
+  $("loginButton")?.addEventListener("click", loginUser);
+  $("registerButton")?.addEventListener("click", registerUser);
+  $("logoutButton")?.addEventListener("click", logoutUser);
+
+  $("showRegisterButton")?.addEventListener("click", () => {
+    $("loginForm")?.classList.add("hidden");
+    $("registerForm")?.classList.remove("hidden");
   });
 
-  const walletButton = $("reloadWalletButton");
+  $("showLoginButton")?.addEventListener("click", () => {
+    $("registerForm")?.classList.add("hidden");
+    $("loginForm")?.classList.remove("hidden");
+  });
 
-  if (walletButton) {
-    walletButton.addEventListener("click", refreshSpAccount);
+  document.querySelectorAll("[data-panel]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const panelId = button.dataset.panel;
+
+      if (
+        panelId === "adminPanel" &&
+        currentProfile?.role !== "admin"
+      ) {
+        alert("Huna ruhusa ya kufungua sehemu ya admin.");
+        return;
+      }
+
+      showPanel(panelId);
+    });
+  });
+
+  $("reloadWalletButton")?.addEventListener("click", async () => {
+    try {
+      await loadWallet();
+      alert("Salio limehakikiwa.");
+    } catch (error) {
+      alert("Imeshindikana kupata salio: " + error.message);
+    }
+  });
+
+  async function initialize() {
+    const { data, error } = await db.auth.getSession();
+
+    if (error) {
+      showSection("authSection");
+      return;
+    }
+
+    if (data.session?.user) {
+      await bootApp();
+    } else {
+      showSection("authSection");
+    }
   }
-}
 
-bindSpPart6Events();
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initialize);
+  } else {
+    initialize();
+  }
 
-/* ====================================
-   MWISHO WA JAVASCRIPT YA SWALI PESA
-   ==================================== */
+  
+  // ==============================
+  // SEHEMU YA 2: MFUMO WA MASWALI
+  // ==============================
+
+  let activeQuestion = null;
+  let questionTimerInterval = null;
+  let questionSecondsLeft = 120;
+  let answerSubmitted = false;
+
+  function stopQuestionTimer() {
+    if (questionTimerInterval !== null) {
+      clearInterval(questionTimerInterval);
+      questionTimerInterval = null;
+    }
+  }
+
+  function showQuestionTimer(seconds) {
+    questionSecondsLeft = seconds;
+
+    const timer = $("questionTimer");
+    if (timer) {
+      timer.textContent = "Muda: " + questionSecondsLeft + " sekunde";
+    }
+  }
+
+  function startQuestionTimer(seconds = 120) {
+    stopQuestionTimer();
+    showQuestionTimer(seconds);
+
+    questionTimerInterval = setInterval(async () => {
+      questionSecondsLeft--;
+
+      showQuestionTimer(questionSecondsLeft);
+
+      if (questionSecondsLeft <= 0) {
+        stopQuestionTimer();
+
+        if (!answerSubmitted) {
+          answerSubmitted = true;
+
+          showMessage(
+            "questionMessage",
+            "Muda umeisha. Anza swali jipya."
+          );
+
+          if ($("questionArea")) {
+            $("questionArea").innerHTML =
+              "<p>Muda wa kujibu swali hili umeisha.</p>";
+          }
+
+          if ($("startQuestionButton")) {
+            $("startQuestionButton").disabled = false;
+          }
+        }
+      }
+    }, 1000);
+  }
+
+  function clearQuestionArea() {
+    const area = $("questionArea");
+    if (area) area.innerHTML = "";
+  }
+
+  function renderQuestion(question) {
+    const area = $("questionArea");
+    if (!area) return;
+
+    area.innerHTML = "";
+
+    const title = document.createElement("h3");
+    title.textContent = question.question || "Swali";
+    area.appendChild(title);
+
+    const options = Array.isArray(question.options)
+      ? question.options
+      : [];
+
+    options.forEach((option, index) => {
+      const label = document.createElement("label");
+      label.className = "question-option";
+
+      const radio = document.createElement("input");
+      radio.type = "radio";
+      radio.name = "spSelectedAnswer";
+      radio.value = String(index);
+
+      const text = document.createElement("span");
+      text.textContent = String(option);
+
+      label.appendChild(radio);
+      label.appendChild(text);
+      area.appendChild(label);
+    });
+
+    const submitButton = document.createElement("button");
+    submitButton.type = "button";
+    submitButton.className = "btn";
+    submitButton.textContent = "TUMA JIBU";
+
+    submitButton.addEventListener("click", submitQuestionAnswer);
+
+    area.appendChild(submitButton);
+  }
+
+  async function startQuestion() {
+    if (!currentUser) {
+      showMessage(
+        "questionMessage",
+        "Ingia kwenye akaunti kwanza.",
+        true
+      );
+      return;
+    }
+
+    const button = $("startQuestionButton");
+    if (button) button.disabled = true;
+
+    stopQuestionTimer();
+    answerSubmitted = false;
+    activeQuestion = null;
+    clearQuestionArea();
+
+    showMessage("questionMessage", "Tunatafuta swali...");
+
+    try {
+      const { data, error } = await db.rpc("sp_start_question");
+
+      if (error) throw error;
+
+      if (!data || data.success !== true) {
+        throw new Error(
+          data?.message || "Hakuna swali linalopatikana kwa sasa."
+        );
+      }
+
+      const questions = Array.isArray(data.questions)
+        ? data.questions
+        : [];
+
+      if (questions.length === 0) {
+        throw new Error("Hakuna swali linalopatikana kwa sasa.");
+      }
+
+      activeQuestion = questions[0];
+
+      if (!activeQuestion.question_id) {
+        throw new Error("Swali halina kitambulisho sahihi.");
+      }
+
+      renderQuestion(activeQuestion);
+
+      const seconds = Number(data.seconds || 120);
+
+      startQuestionTimer(
+        Number.isFinite(seconds) && seconds > 0 ? seconds : 120
+      );
+
+      showMessage(
+        "questionMessage",
+        "Jibu swali kabla muda haujaisha."
+      );
+    } catch (error) {
+      showMessage(
+        "questionMessage",
+        "Imeshindikana kuanza swali: " + error.message,
+        true
+      );
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  async function submitQuestionAnswer() {
+    if (!activeQuestion || answerSubmitted) return;
+
+    const selected = document.querySelector(
+      'input[name="spSelectedAnswer"]:checked'
+    );
+
+    if (!selected) {
+      showMessage(
+        "questionMessage",
+        "Chagua jibu kwanza.",
+        true
+      );
+      return;
+    }
+
+    const selectedOption = Number(selected.value);
+
+    if (
+      !Number.isInteger(selectedOption) ||
+      selectedOption < 0
+    ) {
+      showMessage(
+        "questionMessage",
+        "Jibu ulilochagua si sahihi.",
+        true
+      );
+      return;
+    }
+
+    answerSubmitted = true;
+    stopQuestionTimer();
+
+    const area = $("questionArea");
+    const submitButton = area?.querySelector("button");
+
+    if (submitButton) submitButton.disabled = true;
+
+    document.querySelectorAll(
+      'input[name="spSelectedAnswer"]'
+    ).forEach((radio) => {
+      radio.disabled = true;
+    });
+
+    showMessage("questionMessage", "Tunathibitisha jibu lako...");
+
+    try {
+      const { data, error } = await db.rpc("sp_submit_answer", {
+        p_question_id: activeQuestion.question_id,
+        p_selected_option: selectedOption
+      });
+
+      if (error) throw error;
+
+      if (!data || data.success !== true) {
+        throw new Error(
+          data?.message || "Jibu halikukubaliwa."
+        );
+      }
+
+      const correct = data.is_correct === true;
+      const reward = Number(data.reward_amount || 0);
+
+      if (correct) {
+        showMessage(
+          "questionMessage",
+          "Hongera! Jibu ni sahihi. Zawadi iliyoripotiwa: " +
+            reward.toLocaleString("en-US") +
+            " TSh."
+        );
+      } else {
+        showMessage(
+          "questionMessage",
+          "Jibu si sahihi. " +
+            (data.message || "Unaweza kujaribu swali jingine.")
+        );
+      }
+
+      activeQuestion = null;
+
+      if (area) {
+        area.innerHTML =
+          "<p>Swali limekamilika. Bonyeza kitufe kuanza swali jingine.</p>";
+      }
+
+      if ($("startQuestionButton")) {
+        $("startQuestionButton").disabled = false;
+      }
+
+      await loadWallet();
+    } catch (error) {
+      answerSubmitted = false;
+
+      if (submitButton) submitButton.disabled = false;
+
+      document.querySelectorAll(
+        'input[name="spSelectedAnswer"]'
+      ).forEach((radio) => {
+        radio.disabled = false;
+      });
+
+      showMessage(
+        "questionMessage",
+        "Imeshindikana kutuma jibu: " + error.message,
+        true
+      );
+    }
+  }
+
+  $("startQuestionButton")?.addEventListener(
+    "click",
+    startQuestion
+  );
+
+
+  // ==============================
+  // SEHEMU YA 3: KUWEKA PESA
+  // ==============================
+
+  const SP_PAYMENT_NUMBER = "0702715377";
+  const SP_SUPPORT_NUMBER = "0717729730";
+
+  function formatMoney(amount) {
+    return Number(amount || 0).toLocaleString("en-US") + " TSh";
+  }
+
+  function showDepositNumber() {
+    const element = $("depositPayNumber");
+
+    if (element) {
+      element.textContent = SP_PAYMENT_NUMBER;
+    }
+  }
+
+  async function submitDeposit() {
+    if (!currentUser) {
+      showMessage(
+        "depositMessage",
+        "Ingia kwenye akaunti kwanza.",
+        true
+      );
+      return;
+    }
+
+    const amount = Number($("depositAmount")?.value);
+    const payerPhone = $("payerPhone")?.value.trim();
+    const reference = $("depositReference")?.value.trim();
+
+    if (!Number.isFinite(amount) || amount < 100) {
+      showMessage(
+        "depositMessage",
+        "Kiasi cha chini cha kuweka pesa ni TSh 100.",
+        true
+      );
+      return;
+    }
+
+    if (!payerPhone || !reference) {
+      showMessage(
+        "depositMessage",
+        "Weka namba uliyotumia kulipia na namba ya kumbukumbu ya muamala.",
+        true
+      );
+      return;
+    }
+
+    const button = $("submitDepositButton");
+    if (button) button.disabled = true;
+
+    showMessage("depositMessage", "Tunatuma ombi lako...");
+
+    try {
+      /*
+       * MUHIMU:
+       * Code hii inahitaji jedwali sp_deposits liwe na:
+       * user_id, amount, payer_phone, reference, status.
+       * Hakikisha majina haya yanafanana na schema yako.
+       */
+
+      const { error } = await db
+        .from("sp_deposits")
+        .insert({
+          user_id: currentUser.id,
+          amount: amount,
+          payer_phone: payerPhone,
+          reference: reference,
+          status: "pending"
+        });
+
+      if (error) throw error;
+
+      showMessage(
+        "depositMessage",
+        "Ombi limetumwa. Admin atakagua malipo yako kabla ya kuongeza salio."
+      );
+
+      if ($("depositAmount")) $("depositAmount").value = "";
+      if ($("payerPhone")) $("payerPhone").value = "";
+      if ($("depositReference")) $("depositReference").value = "";
+
+      await loadMyDeposits();
+    } catch (error) {
+      showMessage(
+        "depositMessage",
+        "Ombi halijatumwa: " + error.message,
+        true
+      );
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  async function loadMyDeposits() {
+    const list = $("myDepositsList");
+    if (!list || !currentUser) return;
+
+    list.textContent = "Tunapakia maombi yako...";
+
+    try {
+      const { data, error } = await db
+        .from("sp_deposits")
+        .select("id, amount, reference, status, created_at")
+        .eq("user_id", currentUser.id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      list.innerHTML = "";
+
+      if (!data || data.length === 0) {
+        list.textContent = "Bado huna maombi ya kuweka pesa.";
+        return;
+      }
+
+      data.forEach((deposit) => {
+        const item = document.createElement("div");
+        item.className = "list-item";
+
+        const amount = document.createElement("strong");
+        amount.textContent = formatMoney(deposit.amount);
+
+        const status = document.createElement("p");
+        status.textContent =
+          "Hali: " + String(deposit.status || "pending");
+
+        const referenceText = document.createElement("p");
+        referenceText.textContent =
+          "Kumbukumbu: " + String(deposit.reference || "-");
+
+        const date = document.createElement("small");
+        date.textContent = deposit.created_at
+          ? new Date(deposit.created_at).toLocaleString()
+          : "";
+
+        item.append(amount, status, referenceText, date);
+        list.appendChild(item);
+      });
+    } catch (error) {
+      list.textContent =
+        "Imeshindwa kupakia maombi: " + error.message;
+    }
+  }
+
+  $("submitDepositButton")?.addEventListener(
+    "click",
+    submitDeposit
+  );
+
+  $("reloadMyDepositsButton")?.addEventListener(
+    "click",
+    loadMyDeposits
+  );
+
+  showDepositNumber();
+
+  
+  // ==============================
+  // SEHEMU YA 4: KUTOA PESA
+  // ==============================
+
+  async function submitWithdrawal() {
+    if (!currentUser) {
+      showMessage(
+        "withdrawMessage",
+        "Ingia kwenye akaunti kwanza.",
+        true
+      );
+      return;
+    }
+
+    const amount = Number($("withdrawAmount")?.value);
+    const phone = $("withdrawPhone")?.value.trim();
+
+    if (!Number.isFinite(amount) || amount < 100) {
+      showMessage(
+        "withdrawMessage",
+        "Kiasi cha chini cha kutoa ni TSh 100.",
+        true
+      );
+      return;
+    }
+
+    if (!phone) {
+      showMessage(
+        "withdrawMessage",
+        "Weka namba ya simu unayotaka kupokea pesa.",
+        true
+      );
+      return;
+    }
+
+    if (!currentWallet || Number(currentWallet.balance || 0) < amount) {
+      showMessage(
+        "withdrawMessage",
+        "Salio lako halitoshi.",
+        true
+      );
+      return;
+    }
+
+    const button = $("submitWithdrawalButton");
+    if (button) button.disabled = true;
+
+    showMessage("withdrawMessage", "Tunatuma ombi lako...");
+
+    try {
+      const { data, error } = await db.rpc(
+        "sp_request_withdrawal",
+        {
+          p_amount: amount,
+          p_phone: phone
+        }
+      );
+
+      if (error) throw error;
+
+      if (data && data.success === false) {
+        throw new Error(
+          data.message || "Ombi la kutoa pesa limekataliwa."
+        );
+      }
+
+      showMessage(
+        "withdrawMessage",
+        "Ombi lako limetumwa. Subiri admin akague na kushughulikia malipo."
+      );
+
+      if ($("withdrawAmount")) $("withdrawAmount").value = "";
+      if ($("withdrawPhone")) $("withdrawPhone").value = "";
+
+      await loadWallet();
+      await loadMyWithdrawals();
+    } catch (error) {
+      showMessage(
+        "withdrawMessage",
+        "Ombi halijatumwa: " + error.message,
+        true
+      );
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  async function loadMyWithdrawals() {
+    const list = $("myWithdrawalsList");
+    if (!list || !currentUser) return;
+
+    list.textContent = "Tunapakia historia ya maombi...";
+
+    try {
+      const { data, error } = await db
+        .from("sp_withdrawals")
+        .select(
+          "id, amount, phone, status, reference, admin_note, created_at"
+        )
+        .eq("user_id", currentUser.id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      list.innerHTML = "";
+
+      if (!data || data.length === 0) {
+        list.textContent = "Bado hujaomba kutoa pesa.";
+        return;
+      }
+
+      data.forEach((withdrawal) => {
+        const item = document.createElement("div");
+        item.className = "list-item";
+
+        const amount = document.createElement("strong");
+        amount.textContent = formatMoney(withdrawal.amount);
+
+        const phone = document.createElement("p");
+        phone.textContent =
+          "Namba ya kupokea: " + String(withdrawal.phone || "-");
+
+        const status = document.createElement("p");
+        status.textContent =
+          "Hali: " + String(withdrawal.status || "pending");
+
+        const reference = document.createElement("p");
+        reference.textContent =
+          "Kumbukumbu: " + String(withdrawal.reference || "-");
+
+        const note = document.createElement("p");
+        note.textContent =
+          withdrawal.admin_note
+            ? "Ujumbe wa admin: " + withdrawal.admin_note
+            : "";
+
+        const date = document.createElement("small");
+        date.textContent = withdrawal.created_at
+          ? new Date(withdrawal.created_at).toLocaleString()
+          : "";
+
+        item.append(amount, phone, status, reference, note, date);
+        list.appendChild(item);
+      });
+    } catch (error) {
+      list.textContent =
+        "Imeshindwa kupakia historia: " + error.message;
+    }
+  }
+
+  $("submitWithdrawalButton")?.addEventListener(
+    "click",
+    submitWithdrawal
+  );
+
+  $("reloadMyWithdrawalsButton")?.addEventListener(
+    "click",
+    loadMyWithdrawals
+  );
+
+  
+  // ==============================
+  // SEHEMU YA 5: HISTORIA NA PROFILE
+  // ==============================
+
+  async function loadTransactionHistory() {
+    const list = $("historyList");
+    if (!list || !currentUser) return;
+
+    list.textContent = "Tunapakia historia ya miamala...";
+
+    try {
+      const { data, error } = await db
+        .from("sp_transactions")
+        .select("*")
+        .eq("user_id", currentUser.id)
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+
+      list.innerHTML = "";
+
+      if (!data || data.length === 0) {
+        list.textContent = "Bado hakuna miamala kwenye historia yako.";
+        return;
+      }
+
+      data.forEach((transaction) => {
+        const item = document.createElement("div");
+        item.className = "list-item";
+
+        const type = document.createElement("strong");
+        type.textContent = String(transaction.type || "Muamala");
+
+        const amount = document.createElement("p");
+        amount.textContent = "Kiasi: " + formatMoney(transaction.amount);
+
+        const status = document.createElement("p");
+        status.textContent =
+          "Hali: " + String(transaction.status || "-");
+
+        const reference = document.createElement("p");
+        reference.textContent =
+          "Kumbukumbu: " + String(transaction.reference || "-");
+
+        const description = document.createElement("p");
+        description.textContent =
+          String(transaction.description || "");
+
+        const date = document.createElement("small");
+        date.textContent = transaction.created_at
+          ? new Date(transaction.created_at).toLocaleString()
+          : "";
+
+        item.append(type, amount, status, reference, description, date);
+        list.appendChild(item);
+      });
+    } catch (error) {
+      list.textContent =
+        "Imeshindwa kupakia historia: " + error.message;
+    }
+  }
+
+  async function saveProfile() {
+    if (!currentUser) return;
+
+    const fullName = $("profileName")?.value.trim();
+    const phone = $("profilePhone")?.value.trim();
+
+    if (!fullName || !phone) {
+      showMessage(
+        "profileMessage",
+        "Jaza jina na namba ya simu.",
+        true
+      );
+      return;
+    }
+
+    showMessage("profileMessage", "Tunasasisha profaili...");
+
+    try {
+      const { error } = await db
+        .from("sp_profiles")
+        .update({
+          full_name: fullName,
+          phone: phone
+        })
+        .eq("id", currentUser.id);
+
+      if (error) throw error;
+
+      await loadProfile();
+
+      showMessage(
+        "profileMessage",
+        "Taarifa zako zimesasishwa."
+      );
+    } catch (error) {
+      showMessage(
+        "profileMessage",
+        "Imeshindwa kusasisha profaili: " + error.message,
+        true
+      );
+    }
+  }
+
+  async function copyReferralCode() {
+    const code = $("profileReferralCode")?.value.trim();
+
+    if (!code) {
+      showMessage(
+        "profileMessage",
+        "Msimbo wa mwaliko haujapatikana.",
+        true
+      );
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(code);
+
+      showMessage(
+        "profileMessage",
+        "Msimbo wa mwaliko umenakiliwa: " + code
+      );
+    } catch {
+      showMessage(
+        "profileMessage",
+        "Simu haijaweza kunakili msimbo. Chagua na unakili mwenyewe: " + code,
+        true
+      );
+    }
+  }
+
+  function inviteFriend() {
+    const code = $("profileReferralCode")?.value.trim();
+
+    if (!code) {
+      showMessage(
+        "profileMessage",
+        "Msimbo wa mwaliko haujapatikana.",
+        true
+      );
+      return;
+    }
+
+    const message =
+      "Karibu SWALI PESA! Jiunge nasi. Msimbo wangu wa mwaliko ni: " +
+      code;
+
+    const url =
+      "https://wa.me/?text=" + encodeURIComponent(message);
+
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  $("reloadHistoryButton")?.addEventListener(
+    "click",
+    loadTransactionHistory
+  );
+
+  $("copyReferralButton")?.addEventListener(
+    "click",
+    copyReferralCode
+  );
+
+  $("inviteFriendButton")?.addEventListener(
+    "click",
+    inviteFriend
+  );
+
+  
+  // ==============================
+  // SEHEMU YA 6: ADMIN - MASWALI
+  // ==============================
+
+  async function createAdminQuestion() {
+    if (currentProfile?.role !== "admin") {
+      showMessage(
+        "adminQuestionMessage",
+        "Huna ruhusa ya kutengeneza maswali.",
+        true
+      );
+      return;
+    }
+
+    const questionText = $("adminQuestion")?.value.trim();
+
+    const options = [
+      $("opt0")?.value.trim(),
+      $("opt1")?.value.trim(),
+      $("opt2")?.value.trim(),
+      $("opt3")?.value.trim()
+    ];
+
+    const correctOption = Number($("correctOption")?.value);
+
+    if (!questionText || options.some((option) => !option)) {
+      showMessage(
+        "adminQuestionMessage",
+        "Jaza swali na majibu yote manne.",
+        true
+      );
+      return;
+    }
+
+    if (
+      !Number.isInteger(correctOption) ||
+      correctOption < 0 ||
+      correctOption > 3
+    ) {
+      showMessage(
+        "adminQuestionMessage",
+        "Chagua jibu sahihi.",
+        true
+      );
+      return;
+    }
+
+    const button = $("createQuestionButton");
+    if (button) button.disabled = true;
+
+    showMessage("adminQuestionMessage", "Tunatengeneza swali...");
+
+    try {
+      const { data, error } = await db.rpc(
+        "sp_admin_create_question",
+        {
+          p_question_text: questionText,
+          p_options: options,
+          p_correct_option: correctOption
+        }
+      );
+
+      if (error) throw error;
+
+      if (data && data.success === false) {
+        throw new Error(data.message || "Swali halijatengenezwa.");
+      }
+
+      showMessage(
+        "adminQuestionMessage",
+        "Swali limetumwa kwa mfumo."
+      );
+
+      if ($("adminQuestion")) $("adminQuestion").value = "";
+      ["opt0", "opt1", "opt2", "opt3"].forEach((id) => {
+        if ($(id)) $(id).value = "";
+      });
+
+      await loadAdminQuestions();
+    } catch (error) {
+      showMessage(
+        "adminQuestionMessage",
+        "Imeshindikana kutengeneza swali: " + error.message,
+        true
+      );
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  async function loadAdminQuestions() {
+    const list = $("adminQuestionsList");
+    if (!list) return;
+
+    if (currentProfile?.role !== "admin") {
+      list.textContent = "Sehemu hii ni ya admin pekee.";
+      return;
+    }
+
+    list.textContent = "Tunapakia maswali...";
+
+    try {
+      const { data, error } = await db.rpc("sp_admin_list_questions");
+
+      if (error) throw error;
+
+      const questions = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.questions)
+          ? data.questions
+          : [];
+
+      list.innerHTML = "";
+
+      if (questions.length === 0) {
+        list.textContent = "Hakuna maswali yaliyopatikana.";
+        return;
+      }
+
+      questions.forEach((question) => {
+        const item = document.createElement("div");
+        item.className = "list-item";
+
+        const title = document.createElement("strong");
+        title.textContent =
+          question.question_text ||
+          question.question ||
+          "Swali";
+
+        const status = document.createElement("p");
+        status.textContent =
+          "Hali: " + String(question.status || "limehifadhiwa");
+
+        item.append(title, status);
+        list.appendChild(item);
+      });
+    } catch (error) {
+      list.textContent =
+        "Imeshindwa kupakia maswali: " + error.message;
+    }
+  }
+
+  $("createQuestionButton")?.addEventListener(
+    "click",
+    createAdminQuestion
+  );
+
+  $("reloadAdminQuestionsButton")?.addEventListener(
+    "click",
+    loadAdminQuestions
+  );
+
+  
+  // ==============================
+  // SEHEMU YA 7: ADMIN - MAOMBI
+  // ==============================
+
+  async function loadAdminDeposits() {
+    const list = $("adminDepositsList");
+    if (!list) return;
+
+    if (currentProfile?.role !== "admin") {
+      list.textContent = "Sehemu hii ni ya admin pekee.";
+      return;
+    }
+
+    list.textContent = "Tunapakia maombi ya kuweka pesa...";
+
+    try {
+      const { data, error } = await db
+        .from("sp_deposits")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+
+      list.innerHTML = "";
+
+      if (!data || data.length === 0) {
+        list.textContent = "Hakuna maombi ya kuweka pesa.";
+        return;
+      }
+
+      data.forEach((deposit) => {
+        const item = document.createElement("div");
+        item.className = "list-item";
+
+        const amount = document.createElement("strong");
+        amount.textContent = formatMoney(deposit.amount);
+
+        const phone = document.createElement("p");
+        phone.textContent =
+          "Simu ya malipo: " +
+          String(deposit.payer_phone || deposit.phone || "-");
+
+        const reference = document.createElement("p");
+        reference.textContent =
+          "Kumbukumbu: " + String(deposit.reference || "-");
+
+        const status = document.createElement("p");
+        status.textContent =
+          "Hali: " + String(deposit.status || "pending");
+
+        const user = document.createElement("p");
+        user.textContent = "User ID: " + String(deposit.user_id || "-");
+
+        item.append(amount, phone, reference, status, user);
+
+        if (deposit.status === "pending") {
+          const note = document.createElement("p");
+          note.textContent =
+            "Thibitisha malipo halisi kabla ya kuongeza salio.";
+          item.appendChild(note);
+        }
+
+        list.appendChild(item);
+      });
+    } catch (error) {
+      list.textContent =
+        "Imeshindwa kupakia maombi: " + error.message;
+    }
+  }
+
+  async function loadAdminWithdrawals() {
+    const list = $("adminWithdrawalsList");
+    if (!list) return;
+
+    if (currentProfile?.role !== "admin") {
+      list.textContent = "Sehemu hii ni ya admin pekee.";
+      return;
+    }
+
+    list.textContent = "Tunapakia maombi ya kutoa pesa...";
+
+    try {
+      const { data, error } = await db.rpc(
+        "sp_admin_list_withdrawals"
+      );
+
+      if (error) throw error;
+
+      const withdrawals = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.withdrawals)
+          ? data.withdrawals
+          : [];
+
+      list.innerHTML = "";
+
+      if (withdrawals.length === 0) {
+        list.textContent = "Hakuna maombi ya kutoa pesa.";
+        return;
+      }
+
+      withdrawals.forEach((withdrawal) => {
+        const item = document.createElement("div");
+        item.className = "list-item";
+
+        const amount = document.createElement("strong");
+        amount.textContent = formatMoney(withdrawal.amount);
+
+        const phone = document.createElement("p");
+        phone.textContent =
+          "Simu: " + String(withdrawal.phone || "-");
+
+        const status = document.createElement("p");
+        status.textContent =
+          "Hali: " + String(withdrawal.status || "pending");
+
+        const user = document.createElement("p");
+        user.textContent =
+          "User ID: " + String(withdrawal.user_id || "-");
+
+        item.append(amount, phone, status, user);
+
+        if (withdrawal.status === "pending") {
+          const approve = document.createElement("button");
+          approve.type = "button";
+          approve.className = "btn";
+          approve.textContent = "IDHINISHA";
+
+          approve.addEventListener("click", () => {
+            updateWithdrawalStatus(withdrawal.id, "approved");
+          });
+
+          const reject = document.createElement("button");
+          reject.type = "button";
+          reject.className = "btn";
+          reject.textContent = "KATAA";
+
+          reject.addEventListener("click", () => {
+            updateWithdrawalStatus(withdrawal.id, "rejected");
+          });
+
+          item.append(approve, reject);
+        }
+
+        list.appendChild(item);
+      });
+    } catch (error) {
+      list.textContent =
+        "Imeshindwa kupakia maombi: " + error.message;
+    }
+  }
+
+  async function updateWithdrawalStatus(id, decision) {
+    if (currentProfile?.role !== "admin") {
+      alert("Huna ruhusa ya kufanya kitendo hiki.");
+      return;
+    }
+
+    const message = decision === "approved"
+      ? "Je, umethibitisha na kukamilisha malipo halisi?"
+      : "Je, unataka kukataa ombi hili?";
+
+    if (!confirm(message)) return;
+
+    let adminNote = "";
+
+    if (decision === "rejected") {
+      adminNote = prompt("Sababu ya kukataa (hiari):") || "";
+    }
+
+    try {
+      const { data, error } = await db.rpc(
+        "sp_admin_update_withdrawal",
+        {
+          p_withdrawal_id: id,
+          p_decision: decision,
+          p_admin_note: adminNote || null
+        }
+      );
+
+      if (error) throw error;
+
+      if (data && data.success === false) {
+        throw new Error(
+          data.message || "Hali ya ombi haikubadilishwa."
+        );
+      }
+
+      alert("Ombi limechakatwa na mfumo.");
+
+      await loadAdminWithdrawals();
+    } catch (error) {
+      alert("Hitilafu: " + error.message);
+    }
+  }
+
+  $("reloadAdminDepositsButton")?.addEventListener(
+    "click",
+    loadAdminDeposits
+  );
+
+  $("reloadAdminWithdrawalsButton")?.addEventListener(
+    "click",
+    loadAdminWithdrawals
+  );
+
+  
+  // ==============================
+  // SEHEMU YA 8: KUKAMILISHA MFUMO
+  // ==============================
+
+  $("reloadWalletButton")?.addEventListener("click", async () => {
+    try {
+      await loadWallet();
+    } catch (error) {
+      alert("Imeshindwa kusasisha salio: " + error.message);
+    }
+  });
+
+  // Pakia data husika panel inapofunguliwa.
+  document.querySelectorAll("[data-panel]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      if (!currentUser) return;
+
+      const panelId = button.dataset.panel;
+
+      try {
+        if (panelId === "depositPanel") {
+          showDepositNumber();
+          await loadMyDeposits();
+        } else if (panelId === "withdrawPanel") {
+          await loadMyWithdrawals();
+        } else if (panelId === "historyPanel") {
+          await loadTransactionHistory();
+        } else if (panelId === "adminPanel") {
+          if (currentProfile?.role !== "admin") return;
+
+          await Promise.all([
+            loadAdminQuestions(),
+            loadAdminDeposits(),
+            loadAdminWithdrawals()
+          ]);
+        }
+      } catch (error) {
+        console.error("Panel loading error:", error);
+      }
+    });
+  });
+
+  // Anzisha programu baada ya DOM kuwa tayari.
+  // initialize() tayari imeunganishwa kwenye Sehemu ya 1.
+  // Usiiite tena hapa ili kuepuka kuanzisha mfumo mara mbili.
+
+})();
 </script>
+
 </body>
-</html>
- 
- 
- 
- 
+</html> 
