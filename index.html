@@ -385,44 +385,42 @@ footer{text-align:center;font-size:12px;padding:18px}
     }
   }
 
-  async function loginUser() {
-    const email = $("loginEmail").value.trim();
-    const password = $("loginPassword").value;
 
-    if (!email || !password) {
-      message(
-        "authMessage",
-        "Weka barua pepe na nenosiri lako.",
-        "error"
-      );
-      return;
+async function login() {
+  const email = $("loginEmail")?.value?.trim();
+  const password = $("loginPassword")?.value;
+  const button = $("loginButton");
+
+  if (!email || !password) {
+    message("authMessage", "Weka barua pepe na nenosiri lako.", "error");
+    return;
+  }
+
+  try {
+    if (button) {
+      button.disabled = true;
+      button.textContent = "INAINGIA...";
     }
 
-    const button = $("loginButton");
-    button.disabled = true;
-    button.textContent = "INAINGIA...";
+    const { error } = await client.auth.signInWithPassword({
+      email,
+      password
+    });
 
-    try {
-      const { error } = await client.auth.signInWithPassword({
-        email,
-        password
-      });
+    if (error) throw error;
 
-      if (error) throw error;
-
-      await initializeApp();
-    } catch (error) {
-      console.error("Login:", error);
-      message(
-        "authMessage",
-        "Kuingia kumeshindikana: " + error.message,
-        "error"
-      );
-    } finally {
+    await initializeApp();
+  } catch (error) {
+    console.error("Login:", error);
+    message("authMessage", "Kuingia kumeshindikana: " + error.message, "error");
+  } finally {
+    if (button) {
       button.disabled = false;
       button.textContent = "INGIA";
     }
   }
+}
+
 
   async function logoutUser() {
     stopQuestionTimer();
