@@ -541,62 +541,203 @@ footer{text-align:center;font-size:12px;padding:18px}
   }
 
   
+let swaliPesaDeadline = 0;
+
 async function startQuestion() {
-  if (!currentUser) {
-    message("questionMessage", "Ingia kwanza.", "error");
-    return;
-  }
+  const area = document.getElementById("questionArea");
+  if (!area) return;
 
-  const button = $("startQuestionButton");
-  if (button) {
-    button.disabled = true;
-    button.textContent = "INAPAKIA...";
-  }
-
-  message("questionMessage", "");
+  area.textContent = "Inapakia maswali...";
 
   try {
     const { data, error } = await client.rpc("sp_start_question");
+    if (error) throw error;
+
+    const result = data?.questions ? data :
+      (Array.isArray(data) ? data[0] : data);
+
+    if (!result || !Array.isArray(result.questions) ||
+        result.questions.length === 0) {
+      area.textContent =
+        result?.message || "Hakuna maswali yanayopatikana kwa sasa.";
+      return;
+    }
+
+    renderAllQuestions(result.questions, result.expires_at);
+  } catch (error) {
+    console.error("Maswali:", error);
+    area.textContent = "Imeshindwa kupakia maswali: " + error.message;
+  }
+}
+
+function renderAllQuestions(questions, expiresAt) {
+  const area = document.getElementById("questionArea");
+  if (!area) return;
+
+  if (typeof questionTimer !== "undefined" && questionTimer) {
+    clearInterval(questionTimer);
+  }
+
+  swaliPesaDeadline = new Date(expiresAt).getTime();
+
+  area.replaceChildren();
+
+  const heading = document.createElement("h3");
+  heading.textContent = "MASWALI YA LEO";
+  area.appendChild(heading);
+
+  const info = document.createElement("p");
+  info.className = "muted";
+  info.textContent =
+    "Jibu maswali yote. Una dakika 2 kwa maswali yote kwa pamoja.";
+  area.appendChild(info);
+
+  const timer = document.createElement("div");
+  timer.id = "questionTimer";
+  timer.className = "timer";
+  area.appendChild(timer);
+
+  questions.forEach((question, index) => {
+    const card = document.createElement("div");
+    card.className = "item question-card";
+    card.dataset.questionId =
+      question.question_id || question.id;
+
+    const title = document.createElement("h3");
+    title.textContent =
+      `${index + 1}. ${question.question || question.question_text || "Swali"}`;
+    card.appendChild(title);
+
+    let options = question.options || question.choices || [];
+
+    if (typeof options === "string") {
+      try {
+        options = JSON.parse(options);
+      } catch {
+        options = [];
+      }
+    }
+
+    if (!Array.isArray(options) || options.length === 0) {
+      const warning = document.createElement("p");
+      warning.textContent = "Chaguo za swali hazijapatikana.";
+      card.appendChild(warning);
+      area.appendChild(card);
+      return;
+    }
+
+    options.forEach((option, optionIndex) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "option full";
+      button.textContent =
+        `${String.fromCharCode(65 + optionIndex)}. ${String(option)}`;
+
+      button.addEventListener("click", () => {
+        if (Date.now() >= swaliPesaDeadline) return;
+
+        card.dataset.selectedOption = String(optionIndex);
+
+        card.querySelectorAll(".option").forEach(item => {
+          item.classList.remove("selected");
+        });
+
+        button.classList.add("selected");
+      });
+
+      card.appendChild(button);
+    });
+
+    const submit = document.createElement("button");
+    submit.type = "button";
+    submit.className = "full";
+    submit.textContent = "WASILISHA JIBU";
+
+    submit.addEventListener("click", () => {
+      const selected = card.dataset.selectedOption;
+
+      if (selected === undefined) {
+        alert("Tafadhali chagua jibu kwanza.");
+        return;
+      }
+
+      submitOneAnswer(
+        card.dataset.questionId,
+        Number(selected),
+        card,
+        submit
+      );
+    });
+
+    card.appendChild(submit);
+
+    const message = document.createElement("p");
+    message.className = "muted answer-message";
+    card.appendChild(message);
+
+    area.appendChild(card);
+  });
+
+  function updateTimer() {
+    const remaining = Math.max(
+      0,
+      Math.ceil((swaliPesaDeadline - Date.now()) / 1000)
+    );
+
+    const minutes = Math.floor(remaining / 60);
+    const seconds = remaining % 60;
+
+    timer.textContent =
+      `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+
+    if (remaining <= 0) {
+      clearInterval(questionTimer);
+
+      area.querySelectorAll(".question-card button").forEach(button => {
+        button.disabled = true;
+      });
+
+      timer.textContent = "MUDA UMEISHA";
+    }
+  }
+
+  updateTimer();
+  questionTimer = setInterval(updateTimer, 1000);
+}
+
+async function submitOneAnswer(questionId, selectedOption, card, submitButton) {
+  if (Date.now() >= swaliPesaDeadline) {
+    alert("Muda wa dakika 2 umeisha.");
+    return;
+  }
+
+  const message = card.querySelector(".answer-message");
+  submitButton.disabled = true;
+  message.textContent = "Inawasilisha jibu...";
+
+  try {
+    const { data, error } = await client.rpc("sp_submit_answer", {
+      p_question_id: questionId,
+      p_selected_option: selectedOption
+    });
 
     if (error) throw error;
 
-    console.log("Majibu ya sp_start_question:", data);
-
-    let result = Array.isArray(data) ? data[0] : data;
-
-    // Baadhi ya functions hurejesha swali ndani ya object.
-    if (result?.question && typeof result.question === "object") {
-      result = result.question;
+    if (data?.success) {
+      message.textContent = data.message || "Jibu limewasilishwa.";
+      card.querySelectorAll("button").forEach(button => {
+        button.disabled = true;
+      });
+    } else {
+      message.textContent = data?.message || "Jibu halijakubaliwa.";
+      submitButton.disabled = false;
     }
-
-    if (
-      !result ||
-      result.success === false ||
-      result.error ||
-      result.message && !(
-        result.question_text ||
-        result.question ||
-        result.title ||
-        result.options
-      )
-    ) {
-      throw new Error(
-        result?.message ||
-        result?.error ||
-        "Hakuna swali linalopatikana kwa sasa."
-      );
-    }
-
-    currentQuestion = result;
-    selectedAnswer = null;
-
-    renderQuestion(result);
-
-    if (!$("submitAnswerButton")) {
-      throw new Error(
-        "Swali limepatikana lakini chaguo zake hazijaonyeshwa."
-      );
-    }
+  } catch (error) {
+    console.error("Jibu:", error);
+    message.textContent = "Hitilafu: " + error.message;
+    submitButton.disabled = false;
+  }
+  }
 
     startQuestionTimer();
 
