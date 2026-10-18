@@ -1011,6 +1011,7 @@ console.log("SWALI PESA: FUNCTION MPYA INAENDESHWA");
   // ADMIN: ORODHA YA MASWALI
   // ==========================================
   
+
 async function loadAdminQuestions() {
   const list = $("adminQuestionsList");
   if (!list) return;
@@ -1024,23 +1025,15 @@ async function loadAdminQuestions() {
 
     if (error) throw error;
 
-    console.log("Majibu ya sp_admin_list_questions:", data);
-
-    let questions = [];
-
-    if (Array.isArray(data)) {
-      questions = data;
-    } else if (Array.isArray(data?.questions)) {
-      questions = data.questions;
-    } else if (Array.isArray(data?.data)) {
-      questions = data.data;
-    }
+    const questions = Array.isArray(data?.questions)
+      ? data.questions
+      : [];
 
     list.replaceChildren();
 
     if (questions.length === 0) {
       list.textContent =
-        "Hakuna maswali yaliyopatikana, au muundo wa majibu ya Supabase ni tofauti.";
+        "Hakuna maswali ya leo. Hakikisha swali limehifadhiwa kwa tarehe ya leo.";
       return;
     }
 
@@ -1050,14 +1043,7 @@ async function loadAdminQuestions() {
 
       const title = document.createElement("strong");
       title.textContent =
-        (index + 1) + ". " +
-        (
-          question.question_text ||
-          question.question ||
-          question.title ||
-          "Swali"
-        );
-
+        `${index + 1}. ${question.question || "Swali"}`;
       item.appendChild(title);
 
       if (Array.isArray(question.options)) {
@@ -1065,22 +1051,33 @@ async function loadAdminQuestions() {
         options.className = "muted";
         options.textContent = question.options
           .map((option, i) =>
-            String.fromCharCode(65 + i) + ". " + option
+            `${String.fromCharCode(65 + i)}. ${option}`
           )
           .join(" | ");
-
         item.appendChild(options);
       }
+
+      const answer = document.createElement("div");
+      answer.className = "muted";
+      const correct = Number(question.correct_option);
+
+      answer.textContent =
+        "Jibu sahihi: " +
+        (
+          Number.isInteger(correct) &&
+          correct >= 0 &&
+          correct < (question.options || []).length
+            ? question.options[correct]
+            : "Halijapatikana"
+        );
+
+      item.appendChild(answer);
 
       const status = document.createElement("div");
       status.className = "muted";
       status.textContent =
-        "Tarehe: " +
-        (
-          question.created_at ||
-          question.question_date ||
-          ""
-        );
+        "Hali: " + (question.active ? "Hai" : "Haifanyi kazi") +
+        " | Tarehe: " + (question.active_date || "");
 
       item.appendChild(status);
       list.appendChild(item);
@@ -1092,6 +1089,7 @@ async function loadAdminQuestions() {
       "Imeshindwa kupakia maswali: " + error.message;
   }
 }
+
 
 
   // ==========================================
