@@ -937,66 +937,75 @@ async function submitDeposit() {
   // ==========================================
   // ADMIN: KUONGEZA SWALI
   // ==========================================
-  async function createAdminQuestion() {
-    const question = $("adminQuestion").value.trim();
+  
+async function createAdminQuestion() {
+  const question = $("adminQuestion").value.trim();
 
-    const options = [
-      $("opt0").value.trim(),
-      $("opt1").value.trim(),
-      $("opt2").value.trim(),
-      $("opt3").value.trim()
-    ];
+  const options = [
+    $("opt0").value.trim(),
+    $("opt1").value.trim(),
+    $("opt2").value.trim(),
+    $("opt3").value.trim()
+  ];
 
-    const correctOption = Number($("correctOption").value);
+  const correctOption = Number($("correctOption").value);
 
-    if (!question || options.some((option) => !option)) {
-      message(
-        "adminQuestionMessage",
-        "Jaza swali na chaguo zote nne.",
-        "error"
-      );
-      return;
-    }
-
-    const button = $("createQuestionButton");
-    button.disabled = true;
-    button.textContent = "INAHIFADHI...";
-
-    try {
-      const { data, error } = await state.supabase.rpc("sp_admin_create_question", {
-  p_question_text: question,
-  p_options: options,
-  p_correct_option: correct
-});
-
-      if (error) throw error;
-
-      message(
-        "adminQuestionMessage",
-        "Ombi la kuhifadhi swali limefanikiwa.",
-        "success"
-      );
-
-      $("adminQuestion").value = "";
-      $("opt0").value = "";
-      $("opt1").value = "";
-      $("opt2").value = "";
-      $("opt3").value = "";
-
-      await loadAdminQuestions();
-    } catch (error) {
-      console.error("Create question:", error);
-
-      message(
-        "adminQuestionMessage",
-        "Swali halijahifadhiwa: " + error.message,
-        "error"
-      );
-    } finally {
-      button.disabled = false;
-      button.textContent = "HIFADHI SWALI";
-    }
+  if (question.length < 5 || options.some(option => !option)) {
+    message(
+      "adminQuestionMessage",
+      "Jaza swali na chaguo zote nne.",
+      "error"
+    );
+    return;
   }
+
+  const button = $("createQuestionButton");
+  button.disabled = true;
+  button.textContent = "INAHIFADHI...";
+
+  try {
+    const { data, error } = await client.rpc(
+      "sp_admin_create_question",
+      {
+        p_question_text: question,
+        p_options: options,
+        p_correct_option: correctOption
+      }
+    );
+
+    if (error) throw error;
+
+    if (data && data.success === false) {
+      throw new Error(data.message || "Swali halijahifadhiwa.");
+    }
+
+    message(
+      "adminQuestionMessage",
+      data?.message || "Ombi la kuhifadhi limetumwa. Kagua orodha ya maswali.",
+      "success"
+    );
+
+    $("adminQuestion").value = "";
+    ["opt0", "opt1", "opt2", "opt3"].forEach(id => {
+      $(id).value = "";
+    });
+
+    await loadAdminQuestions();
+
+  } catch (error) {
+    console.error("Create question:", error);
+
+    message(
+      "adminQuestionMessage",
+      "Swali halijahifadhiwa: " + error.message,
+      "error"
+    );
+  } finally {
+    button.disabled = false;
+    button.textContent = "HIFADHI SWALI";
+  }
+}
+
 
   // ==========================================
   // ADMIN: ORODHA YA MASWALI
