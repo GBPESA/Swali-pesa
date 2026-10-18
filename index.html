@@ -806,67 +806,76 @@ footer{text-align:center;font-size:12px;padding:18px}
  }
    // ==========================================
   // DEPOSIT: KUWASILISHA OMBI LA MALIPO
-  // ==========================================
-  async function submitDeposit() {
-    if (!currentUser) {
-      message("depositMessage", "Ingia kwanza.", "error");
-      return;
-    }
-
-    const amount = Number($("depositAmount").value);
-    const phone = $("payerPhone").value.trim();
-    const reference = $("depositReference").value.trim();
-
-    if (!Number.isFinite(amount) || amount < 100) {
-      message(
-        "depositMessage",
-        "Weka kiasi cha TSh 100 au zaidi.",
-        "error"
-      );
-      return;
-    }
-
-    if (!phone || !reference) {
-      message(
-        "depositMessage",
-        "Weka namba uliyolipia na reference ya muamala.",
-        "error"
-      );
-      return;
-    }
-
-    const button = $("submitDepositButton");
-    button.disabled = true;
-    button.textContent = "INATUMA OMBI...";
-
-    https://gbpesa.github.io/Swali-pesa/
-    try {
-  const { error } = await client
-    .from("sp_deposits")
-    .insert({
-      user_id: currentUser.id,
-      amount: amount,
-      payer_phone: phone,
-      reference: reference,
-      status: "pending"
-    });
-
-  if (error) {
-    throw error;
+  // ===========================================
+   
+async function submitDeposit() {
+  if (!currentUser) {
+    message("depositMessage", "Ingia kwanza.", "error");
+    return;
   }
 
-  alert("Ombi la kuweka pesa limetumwa kikamilifu!");
+  const amount = Number($("depositAmount").value);
+  const phone = $("payerPhone").value.trim();
+  const reference = $("depositReference").value.trim();
 
-} catch (error) {
-  console.error("Deposit error:", error);
-  alert("Ombi halijatumwa: " + error.message);
-    }
-      );
-    } finally {
-      button.disabled = false;
-      button.textContent = "TUMA OMBI LA DEPOSIT";
-    }
+  if (!Number.isFinite(amount) || amount < 100) {
+    message(
+      "depositMessage",
+      "Weka kiasi cha TSh 100 au zaidi.",
+      "error"
+    );
+    return;
   }
+
+  if (!phone || !reference) {
+    message(
+      "depositMessage",
+      "Weka namba uliyolipia na reference ya muamala.",
+      "error"
+    );
+    return;
+  }
+
+  const button = $("submitDepositButton");
+  button.disabled = true;
+  button.textContent = "INATUMA OMBI...";
+
+  try {
+    const { error } = await client
+      .from("sp_deposits")
+      .insert({
+        user_id: currentUser.id,
+        amount: amount,
+        payer_phone: phone,
+        reference: reference,
+        status: "pending"
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    message(
+      "depositMessage",
+      "Ombi lako limetumwa. Subiri admin alikague.",
+      "success"
+    );
+
+  } catch (error) {
+    console.error("Deposit error:", error);
+
+    message(
+      "depositMessage",
+      "Ombi halijatumwa: " + error.message,
+      "error"
+    );
+
+  } finally {
+    button.disabled = false;
+    button.textContent = "TUMA OMBI LA DEPOSIT";
+  }
+}
+
 
   // ==========================================
   // HISTORIA YA MIAMALA
