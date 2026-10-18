@@ -540,56 +540,95 @@ footer{text-align:center;font-size:12px;padding:18px}
     }
   }
 
-  async function startQuestion() {
-    if (!currentUser) {
-      message("questionMessage", "Ingia kwanza.", "error");
-      return;
+  
+async function startQuestion() {
+  if (!currentUser) {
+    message("questionMessage", "Ingia kwanza.", "error");
+    return;
+  }
+
+  const button = $("startQuestionButton");
+  if (button) {
+    button.disabled = true;
+    button.textContent = "INAPAKIA...";
+  }
+
+  message("questionMessage", "");
+
+  try {
+    const { data, error } = await client.rpc("sp_start_question");
+
+    if (error) throw error;
+
+    console.log("Majibu ya sp_start_question:", data);
+
+    let result = Array.isArray(data) ? data[0] : data;
+
+    // Baadhi ya functions hurejesha swali ndani ya object.
+    if (result?.question && typeof result.question === "object") {
+      result = result.question;
     }
 
-    const button = $("startQuestionButton");
-
-    if (button) {
-      button.disabled = true;
-      button.textContent = "INAPAKIA...";
-    }
-
-    message("questionMessage", "");
-
-    try {
-      const { data, error } = await client.rpc("sp_start_question");
-
-      if (error) throw error;
-
-      const result = Array.isArray(data) ? data[0] : data;
-
-      if (!result) {
-        throw new Error("Server haikurudisha swali.");
-      }
-
-      if (result.error || result.message) {
-        throw new Error(result.message || result.error);
-      }
-
-      currentQuestion = result;
-      selectedAnswer = null;
-
-      renderQuestion(result);
-      startQuestionTimer();
-    } catch (error) {
-      console.error("Start question:", error);
-
-      message(
-        "questionMessage",
-        "Imeshindwa kuanza swali: " + error.message,
-        "error"
+    if (
+      !result ||
+      result.success === false ||
+      result.error ||
+      result.message && !(
+        result.question_text ||
+        result.question ||
+        result.title ||
+        result.options
+      )
+    ) {
+      throw new Error(
+        result?.message ||
+        result?.error ||
+        "Hakuna swali linalopatikana kwa sasa."
       );
+    }
 
-      if (button) {
-        button.disabled = false;
-        button.textContent = "JARIBU TENA";
-      }
+    currentQuestion = result;
+    selectedAnswer = null;
+
+    renderQuestion(result);
+
+    if (!$("submitAnswerButton")) {
+      throw new Error(
+        "Swali limepatikana lakini chaguo zake hazijaonyeshwa."
+      );
+    }
+
+    startQuestionTimer();
+
+  } catch (error) {
+    console.error("Start question:", error);
+
+    message(
+      "questionMessage",
+      "Swali halijaonekana: " + error.message,
+      "error"
+    );
+
+    const area = $("questionArea");
+    area.replaceChildren();
+
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.id = "startQuestionButton";
+    retry.textContent = "JARIBU TENA";
+    retry.addEventListener("click", startQuestion);
+
+    area.appendChild(retry);
+
+  } finally {
+    const currentButton = $("startQuestionButton");
+    if (currentButton) {
+      currentButton.disabled = false;
+      currentButton.textContent = "ANZA SWALI";
     }
   }
+}
+
 
   function renderQuestion(question) {
     const area = $("questionArea");
