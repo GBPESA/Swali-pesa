@@ -1010,55 +1010,89 @@ console.log("SWALI PESA: FUNCTION MPYA INAENDESHWA");
   // ==========================================
   // ADMIN: ORODHA YA MASWALI
   // ==========================================
-  async function loadAdminQuestions() {
-    const list = $("adminQuestionsList");
+  
+async function loadAdminQuestions() {
+  const list = $("adminQuestionsList");
+  if (!list) return;
 
-    if (!list) return;
+  list.textContent = "Inapakia maswali...";
 
-    list.textContent = "Inapakia maswali...";
+  try {
+    const { data, error } = await client.rpc(
+      "sp_admin_list_questions"
+    );
 
-    try {
-      const { data, error } = await client.rpc(
-        "sp_admin_list_questions"
-      );
+    if (error) throw error;
 
-      if (error) throw error;
+    console.log("Majibu ya sp_admin_list_questions:", data);
 
-      list.replaceChildren();
+    let questions = [];
 
-      if (!data || data.length === 0) {
-        list.textContent = "Hakuna maswali yaliyopatikana.";
-        return;
+    if (Array.isArray(data)) {
+      questions = data;
+    } else if (Array.isArray(data?.questions)) {
+      questions = data.questions;
+    } else if (Array.isArray(data?.data)) {
+      questions = data.data;
+    }
+
+    list.replaceChildren();
+
+    if (questions.length === 0) {
+      list.textContent =
+        "Hakuna maswali yaliyopatikana, au muundo wa majibu ya Supabase ni tofauti.";
+      return;
+    }
+
+    questions.forEach((question, index) => {
+      const item = document.createElement("div");
+      item.className = "item";
+
+      const title = document.createElement("strong");
+      title.textContent =
+        (index + 1) + ". " +
+        (
+          question.question_text ||
+          question.question ||
+          question.title ||
+          "Swali"
+        );
+
+      item.appendChild(title);
+
+      if (Array.isArray(question.options)) {
+        const options = document.createElement("div");
+        options.className = "muted";
+        options.textContent = question.options
+          .map((option, i) =>
+            String.fromCharCode(65 + i) + ". " + option
+          )
+          .join(" | ");
+
+        item.appendChild(options);
       }
 
-      data.forEach((question) => {
-        const item = document.createElement("div");
-        item.className = "item";
+      const status = document.createElement("div");
+      status.className = "muted";
+      status.textContent =
+        "Tarehe: " +
+        (
+          question.created_at ||
+          question.question_date ||
+          ""
+        );
 
-        const title = document.createElement("strong");
-        title.textContent =
-          question.question ||
-          question.question_text ||
-          question.title ||
-          "Swali";
+      item.appendChild(status);
+      list.appendChild(item);
+    });
 
-        item.appendChild(title);
-
-        const status = document.createElement("div");
-        status.className = "muted";
-        status.textContent =
-          "Tarehe: " +
-          safeText(question.created_at || question.question_date || "");
-
-        item.appendChild(status);
-        list.appendChild(item);
-      });
-    } catch (error) {
-      console.error("Admin questions:", error);
-      list.textContent =
-        "Imeshindwa kupakia maswali: " + error.message;
-    }
+  } catch (error) {
+    console.error("Admin questions:", error);
+    list.textContent =
+      "Imeshindwa kupakia maswali: " + error.message;
   }
+}
+
 
   // ==========================================
   // ADMIN: MAOMBI YA DEPOSIT
