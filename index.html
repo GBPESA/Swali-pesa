@@ -963,14 +963,11 @@ async function submitDeposit() {
     button.textContent = "INAHIFADHI...";
 
     try {
-      const { error } = await client.rpc(
-        "sp_admin_create_question",
-        {
-          p_question: question,
-          p_options: options,
-          p_correct_index: correctOption
-        }
-      );
+      const { data, error } = await state.supabase.rpc("sp_admin_create_question", {
+  p_question_text: question,
+  p_options: options,
+  p_correct_option: correct
+});
 
       if (error) throw error;
 
