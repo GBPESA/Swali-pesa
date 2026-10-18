@@ -630,92 +630,108 @@ async function startQuestion() {
 }
 
 
-  function renderQuestion(question) {
-    const area = $("questionArea");
+function renderQuestion(question) {
+  const area = $("questionArea");
 
-    area.replaceChildren();
+  if (!area) {
+    console.error("questionArea haijapatikana kwenye HTML.");
+    return;
+  }
 
-    const title = document.createElement("h3");
-    title.textContent =
-      question.question ||
-      question.question_text ||
-      question.title ||
-      "Swali";
+  area.replaceChildren();
 
-    area.appendChild(title);
+  if (!question || typeof question !== "object") {
+    area.textContent = "Swali halijapatikana. Jaribu tena.";
+    return;
+  }
 
-    const timer = document.createElement("div");
-    timer.id = "questionTimer";
-    timer.className = "timer";
-    timer.textContent = "01:00";
+  const title = document.createElement("h3");
+  title.textContent =
+    question.question ||
+    question.question_text ||
+    question.title ||
+    "Swali";
 
-    area.appendChild(timer);
+  area.appendChild(title);
 
-    const options =
-      question.options ||
-      question.choices ||
-      [
-        question.option_a,
-        question.option_b,
-        question.option_c,
-        question.option_d
-      ].filter(Boolean);
+  const timer = document.createElement("div");
+  timer.id = "questionTimer";
+  timer.className = "timer";
+  timer.textContent = "01:00";
+  area.appendChild(timer);
 
-    if (!Array.isArray(options) || options.length === 0) {
-      area.appendChild(
-        document.createTextNode(
-          " Chaguo za swali hazijapatikana."
-        )
-      );
-      return;
+  let options =
+    question.options ||
+    question.choices ||
+    [
+      question.option_a,
+      question.option_b,
+      question.option_c,
+      question.option_d
+    ].filter(Boolean);
+
+  // Ikiwa options imekuja kama JSON string, ibadilishe kuwa array.
+  if (typeof options === "string") {
+    try {
+      options = JSON.parse(options);
+    } catch (error) {
+      console.error("Imeshindwa kusoma options:", error);
+      options = [];
     }
+  }
 
-    options.forEach((option, index) => {
-      const button = document.createElement("button");
+  if (!Array.isArray(options) || options.length === 0) {
+    const message = document.createElement("p");
+    message.className = "muted";
+    message.textContent =
+      "Chaguo za swali hazijapatikana. Tafadhali mjulishe msimamizi.";
+    area.appendChild(message);
+    return;
+  }
 
-      button.type = "button";
-      button.className = "option full";
+  selectedAnswer = null;
 
-      const letter = document.createElement("span");
-      letter.className = "letter";
-      letter.textContent = String.fromCharCode(65 + index);
+  options.forEach((option, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "option full";
 
-      const text = document.createElement("span");
-      text.textContent = safeText(option);
+    const letter = document.createElement("span");
+    letter.className = "letter";
+    letter.textContent = String.fromCharCode(65 + index);
 
-      button.append(letter, text);
+    const text = document.createElement("span");
+    text.textContent = safeText(option);
 
-      button.addEventListener("click", () => {
-        selectedAnswer = index;
+    button.append(letter, text);
 
-        area.querySelectorAll(".option").forEach((item) => {
-          item.classList.remove("selected");
-        });
+    button.addEventListener("click", () => {
+      selectedAnswer = index;
 
-        button.classList.add("selected");
+      area.querySelectorAll(".option").forEach((item) => {
+        item.classList.remove("selected");
       });
 
-      area.appendChild(button);
+      button.classList.add("selected");
     });
 
-    const submit = document.createElement("button");
+    area.appendChild(button);
+  });
 
-    submit.type = "button";
-    submit.id = "submitAnswerButton";
-    submit.className = "full";
-    submit.textContent = "WASILISHA JIBU";
+  const submit = document.createElement("button");
+  submit.type = "button";
+  submit.className = "full";
+  submit.textContent = "WASILISHA JIBU";
+  submit.addEventListener("click", submitAnswer);
+  area.appendChild(submit);
 
-    submit.addEventListener("click", submitAnswer);
+  const note = document.createElement("p");
+  note.className = "muted";
+  note.textContent = "Tuma jibu lako kabla muda haujaisha.";
+  area.appendChild(note);
+}
 
-    area.appendChild(submit);
-
-    const note = document.createElement("p");
-    note.className = "muted";
-    note.textContent =
-      "Tuma jibu lako kabla muda haujaisha.";
-
-    area.appendChild(note);
-  }
+      
 
   function startQuestionTimer() {
     stopQuestionTimer();
