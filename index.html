@@ -2026,72 +2026,130 @@
   // SEHEMU YA 7: ADMIN - MAOMBI
   // ==============================
 
-  async function loadAdminDeposits() {
-    const list = $("adminDepositsList");
-    if (!list) return;
+ 
+async function loadAdminDeposits() {
+  const list = $("adminDepositsList");
+  if (!list) return;
 
-    if (currentProfile?.role !== "admin") {
-      list.textContent = "Sehemu hii ni ya admin pekee.";
+  if (currentProfile?.role !== "admin") {
+    list.textContent = "Sehemu hii ni ya admin pekee.";
+    return;
+  }
+
+  list.textContent = "Tunapakia maombi ya kuweka pesa...";
+
+  try {
+    const { data, error } = await db
+      .from("sp_deposits")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    if (error) throw error;
+
+    list.innerHTML = "";
+
+    if (!data || data.length === 0) {
+      list.textContent = "Hakuna maombi ya kuweka pesa.";
       return;
     }
 
-    list.textContent = "Tunapakia maombi ya kuweka pesa...";
+    data.forEach((deposit) => {
+      const item = document.createElement("div");
+      item.className = "list-item";
 
-    try {
-      const { data, error } = await db
-        .from("sp_deposits")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(100);
+      const amount = document.createElement("strong");
+      amount.textContent = formatMoney(deposit.amount);
 
-      if (error) throw error;
+      const phone = document.createElement("p");
+      phone.textContent =
+        "Simu ya malipo: " +
+        String(deposit.payer_phone || deposit.phone || "-");
 
-      list.innerHTML = "";
+      const reference = document.createElement("p");
+      reference.textContent =
+        "Kumbukumbu: " + String(deposit.reference || "-");
 
-      if (!data || data.length === 0) {
-        list.textContent = "Hakuna maombi ya kuweka pesa.";
-        return;
+      const status = document.createElement("p");
+      status.textContent =
+        "Hali: " + String(deposit.status || "pending");
+
+      const user = document.createElement("p");
+      user.textContent = "User ID: " + String(deposit.user_id || "-");
+
+      item.append(amount, phone, reference, status, user);
+
+      if (deposit.status === "pending") {
+        const note = document.createElement("p");
+        note.textContent =
+          "Thibitisha malipo halisi kabla ya kuongeza salio.";
+        item.appendChild(note);
+
+        const buttons = document.createElement("div");
+        buttons.style.display = "flex";
+        buttons.style.gap = "10px";
+        buttons.style.marginTop = "12px";
+
+        const approveBtn = document.createElement("button");
+        approveBtn.type = "button";
+        approveBtn.textContent = "KUBALI";
+        approveBtn.style.background = "#087f5b";
+        approveBtn.style.color = "#fff";
+        approveBtn.style.padding = "10px";
+        approveBtn.style.border = "0";
+        approveBtn.style.borderRadius = "8px";
+        approveBtn.style.flex = "1";
+
+        approveBtn.addEventListener("click", async () => {
+          const confirmed = confirm(
+            "Je, umethibitisha kupokea TSh " +
+            deposit.amount +
+            " kutoka kwa mtumiaji huyu?"
+          );
+
+          if (!confirmed) return;
+
+          alert(
+            "Kitufe kinafanya kazi, lakini bado tunahitaji kuunganisha " +
+            "idhini salama ya Supabase kabla ya kuongeza salio."
+          );
+        });
+
+        const rejectBtn = document.createElement("button");
+        rejectBtn.type = "button";
+        rejectBtn.textContent = "KATAA";
+        rejectBtn.style.background = "#c92a2a";
+        rejectBtn.style.color = "#fff";
+        rejectBtn.style.padding = "10px";
+        rejectBtn.style.border = "0";
+        rejectBtn.style.borderRadius = "8px";
+        rejectBtn.style.flex = "1";
+
+        rejectBtn.addEventListener("click", async () => {
+          const confirmed = confirm(
+            "Una uhakika unataka kukataa ombi hili la kuweka pesa?"
+          );
+
+          if (!confirmed) return;
+
+          alert(
+            "Kitufe kinafanya kazi, lakini tunahitaji kuunganisha " +
+            "kukataliwa salama kupitia Supabase."
+          );
+        });
+
+        buttons.append(approveBtn, rejectBtn);
+        item.appendChild(buttons);
       }
 
-      data.forEach((deposit) => {
-        const item = document.createElement("div");
-        item.className = "list-item";
-
-        const amount = document.createElement("strong");
-        amount.textContent = formatMoney(deposit.amount);
-
-        const phone = document.createElement("p");
-        phone.textContent =
-          "Simu ya malipo: " +
-          String(deposit.payer_phone || deposit.phone || "-");
-
-        const reference = document.createElement("p");
-        reference.textContent =
-          "Kumbukumbu: " + String(deposit.reference || "-");
-
-        const status = document.createElement("p");
-        status.textContent =
-          "Hali: " + String(deposit.status || "pending");
-
-        const user = document.createElement("p");
-        user.textContent = "User ID: " + String(deposit.user_id || "-");
-
-        item.append(amount, phone, reference, status, user);
-
-        if (deposit.status === "pending") {
-          const note = document.createElement("p");
-          note.textContent =
-            "Thibitisha malipo halisi kabla ya kuongeza salio.";
-          item.appendChild(note);
-        }
-
-        list.appendChild(item);
-      });
-    } catch (error) {
-      list.textContent =
-        "Imeshindwa kupakia maombi: " + error.message;
-    }
+      list.appendChild(item);
+    });
+  } catch (error) {
+    list.textContent =
+      "Imeshindwa kupakia maombi: " + error.message;
   }
+}
+ 
 
   async function loadAdminWithdrawals() {
     const list = $("adminWithdrawalsList");
