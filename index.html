@@ -649,19 +649,31 @@
             <input id="profilePhone" type="tel" readonly>
           </div>
 
-          <div class="field">
-            <label for="profileReferralCode">Msimbo wako wa mwaliko</label>
-            <input id="profileReferralCode" type="text" readonly>
-          </div>
+          
+<div class="invite-box">
+  <h3>ALIKA RAFIKI — SWALI PESA</h3>
+  <p>
+    Shiriki link yako na marafiki ili wajiunge na SWALI PESA.
+  </p>
 
-          <div class="button-row">
-            <button id="copyReferralButton" class="btn btn-gold" type="button">
-              NAKILI MSIMBO
-            </button>
-            <button id="inviteFriendButton" class="btn" type="button">
-              ALIKA RAFIKI
-            </button>
-          </div>
+  <input
+    id="spInviteLink"
+    type="text"
+    readonly
+    placeholder="Link yako ya mwaliko itaonekana hapa"
+  >
+
+  <button type="button" onclick="copySpInviteLink()">
+    NAKILI LINK
+  </button>
+
+  <button type="button" onclick="shareSpInviteLink()">
+    TUMA WHATSAPP
+  </button>
+
+  <p id="spInviteMessage"></p>
+</div>
+
 
           <p id="profileMessage" class="message" role="status" aria-live="polite"></p>
 
@@ -2389,7 +2401,99 @@ async function loadAdminDeposits() {
   // initialize() tayari imeunganishwa kwenye Sehemu ya 1.
   // Usiiite tena hapa ili kuepuka kuanzisha mfumo mara mbili.
 
-})();
+})()
+  
+async function loadSpInviteLink() {
+  const input = document.getElementById("spInviteLink");
+  const message = document.getElementById("spInviteMessage");
+
+  if (!input) return;
+
+  try {
+    const { data: { user } } = await db.auth.getUser();
+
+    if (!user) {
+      input.value = "";
+      if (message) message.textContent = "Ingia kwanza kwenye akaunti yako.";
+      return;
+    }
+
+    const { data: profile, error } = await db
+      .from("sp_profiles")
+      .select("referral_code")
+      .eq("id", user.id)
+      .single();
+
+    if (error) throw error;
+
+    if (!profile?.referral_code) {
+      input.value = "";
+      if (message) message.textContent = "Msimbo wa mwaliko haujapatikana.";
+      return;
+    }
+
+    const inviteUrl = new URL(window.location.href);
+    inviteUrl.searchParams.set("ref", profile.referral_code);
+    inviteUrl.hash = "";
+
+    input.value = inviteUrl.toString();
+
+    if (message) message.textContent = "";
+  } catch (error) {
+    if (message) {
+      message.textContent = "Imeshindwa kupata link: " + error.message;
+    }
+  }
+}
+
+async function copySpInviteLink() {
+  const input = document.getElementById("spInviteLink");
+  const message = document.getElementById("spInviteMessage");
+
+  if (!input?.value) {
+    await loadSpInviteLink();
+  }
+
+  if (!input?.value) return;
+
+  try {
+    await navigator.clipboard.writeText(input.value);
+
+    if (message) message.textContent = "Link imenakiliwa!";
+  } catch (error) {
+    input.focus();
+    input.select();
+
+    const copied = document.execCommand("copy");
+
+    if (message) {
+      message.textContent = copied
+        ? "Link imenakiliwa!"
+        : "Shikilia link kisha chagua Copy.";
+    }
+  }
+}
+
+async function shareSpInviteLink() {
+  const input = document.getElementById("spInviteLink");
+  const message = document.getElementById("spInviteMessage");
+
+  if (!input?.value) {
+    await loadSpInviteLink();
+  }
+
+  if (!input?.value) return;
+
+  const text =
+    "Karibu SWALI PESA! Jiunge kupitia link yangu ya mwaliko:\n" +
+    input.value;
+
+  const whatsappUrl =
+    "https://wa.me/?text=" + encodeURIComponent(text);
+
+  window.open(whatsappUrl, "_blank");
+}
+
 </script>
 
 </body>
